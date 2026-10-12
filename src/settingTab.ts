@@ -134,6 +134,28 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
         });
       });
 
+    /* ── Body index ── */
+    containerEl.createEl("h3", { text: "Body index" });
+
+    new Setting(containerEl)
+      .setName("Show a children index in the note body")
+      .setDesc(
+        "While the note body is empty — whitespace, or frontmatter and " +
+          "nothing else — lay a children index over it: folders first with " +
+          "their item counts, files with their last modified time. It is an " +
+          "overlay, not part of the document: nothing reflows when it appears, " +
+          "reading mode only: switch the note to editing and it is simply not " +
+          "there, so it can never cover what you are writing. Nothing is " +
+          "written to disk and the header block is never touched.",
+      )
+      .addToggle((tg) => {
+        tg.setValue(this.plugin.settings.showBodyIndex);
+        tg.onChange(async (v) => {
+          this.plugin.settings.showBodyIndex = v;
+          await this.persist();
+        });
+      });
+
     /* ── Tips ── */
     containerEl.createEl("h3", { text: "Tips" });
     containerEl.createEl("p", {

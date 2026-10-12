@@ -732,3 +732,168 @@ export function isEligible(plugin: HierarchyNavigator, file: TFile | null): file
   return true;
 }
 
+
+/* ────────────────────────────────────────────────
+   Body index — the Children of this note, laid over
+   the note body instead of into it.
+   ──────────────────────────────────────────────── */
+
+/** Class of the body index overlay — `main.ts` mounts, positions, removes it. */
+export const INDEX_CLASS = "hn-index";
+
+/** Everything this plugin owns inside a view: header block + body overlay. */
+export const OWNED_SELECTOR = `.${BLOCK_CLASS}, .${INDEX_CLASS}`;
+
+/** How many entries a folder holds, e.g. "312 项". */
+const ITEM_SUFFIX = " 项";
+
+/** Frontmatter block at the very start of a note, for the raw-text fallback. */
+const FRONTMATTER_RE = /^\uFEFF?---\r?\n[\s\S]*?\r?\n---\r?\n?/;
+
+/**
+ * Coarse relative time — "刚刚" / "3 小时前" / "2 天前", falling back to a
+ * plain date once that stops being useful. Deliberately not locale-aware:
+ * `Intl.RelativeTimeFormat` varies too much between machines.
+ */
+function relativeTime(ms: number): string {
+  const diff = Date.now() - ms;
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  if (diff < minute) return "刚刚";
+  if (diff < hour) return `${Math.round(diff / minute)} 分钟前`;
+  if (diff < day) return `${Math.round(diff / hour)} 小时前`;
+  if (diff < 7 * day) return `${Math.round(diff / day)} 天前`;
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/**
+ * Is this note's body empty — only whitespace, or only frontmatter?
+ *
+ * That is the "nothing written yet" case the overlay exists for. Frontmatter
+ * is not body text: a folder note that is nothing but properties is still an
+ * empty page. `null` means the metadata cache has not been built yet, so the
+ * caller should read the file text rather than guess — a wrong `true` here
+ * drops a panel over writing that exists.
+ */
+export function isNoteBodyEmpty(
+  plugin: HierarchyNavigator,
+  file: TFile,
+): boolean | null {
+  const cache = plugin.app.metadataCache.getFileCache(file);
+  if (!cache) return null;
+  const body = (cache.sections ?? []).filter((s) => s.type !== "yaml");
+  return body.length === 0 && !(cache.headings && cache.headings.length > 0);
+}
+
+/** The same question answered from raw text, for files with no cache yet. */
+export function isRawBodyEmpty(text: string): boolean {
+  return text.replace(FRONTMATTER_RE, "").trim() === "";
+}
+
+/**
+ * The body index: a Children-only launcher, laid *over* the note body.
+ *
+ * It is deliberately not part of the document flow. An empty note has nothing
+ * to push around, and taking the overlay away never moves the text by a pixel
+ * — which a block inserted into the document could not promise. `main.ts`
+ * gives it a `top` (the bottom edge of the header block), mounts it in the
+ * pane's content element, and only ever does so in reading mode: an overlay
+ * has no business covering the editor you are writing in.
+ *
+ * Returns null when there is nothing worth showing, so callers can skip it.
+ */
+export function renderBodyIndex(
+  plugin: HierarchyNavigator,
+  file: TFile,
+): HTMLElement | null {
+  if (!plugin.settings.showBodyIndex) return null;
+  if (!plugin.settings.showFolders && !plugin.settings.showFiles) return null;
+
+  // Same logical folder the header block navigates: a Folder Note stands in
+  // for its folder, so its index lists what that folder contains.
+  const logicalFolder = logicalFolderForFile(plugin, file);
+  const folder = logicalFolder ?? file.parent;
+  if (!(folder instanceof TFolder) || folder.path === ROOT) return null;
+
+  const collected: Entry[] = [];
+  collectLogicalChildren(plugin, folder, collected);
+  const items = collected
+    .filter((entry) => {
+      if (entry.path === file.path) return false;
+      return entry instanceof TFolder
+        ? plugin.settings.showFolders
+        : plugin.settings.showFiles;
+    })
+    .sort(compareEntries);
+  if (items.length === 0) return null;
+
+  const root = el("div", { cls: INDEX_CLASS, attr: { "data-hn-file": file.path } });
+
+  /* ── Head: label, counts, and the way into the note ── */
+  const folders = items.filter((i) => i instanceof TFolder).length;
+  const files = items.length - folders;
+  const inner = el("div", { cls: "hn-index-inner" });
+  const head = el("div", { cls: "hn-index-head" });
+  head.appendChild(Icons.grid());
+  head.appendChild(el("span", { cls: "hn-index-title", text: "子节点" }));
+  head.appendChild(
+    el("span", {
+      cls: "hn-index-count",
+      text: `${folders} 文件夹 · ${files} 文件`,
+    }),
+  );
+  inner.appendChild(head);
+
+  /* ── Body: one calm list, folders first — the sort already put them there.
+     Folder rows are bold and count their items; file rows carry the modified
+     time. No tiles, no panel: a launcher, not a dashboard. ── */
+  const body = el("div", { cls: "hn-index-body" });
+  for (const entry of items) {
+    const isDir = entry instanceof TFolder;
+    const folderEntry = isDir ? (entry as TFolder) : null;
+    const fileEntry = isDir ? null : (entry as TFile);
+    const folderNote = folderEntry ? findFolderNoteFile(plugin, folderEntry) : null;
+
+    const row = el("a", {
+      cls:
+        `hn-index-row${isDir ? " hn-index-dir" : ""}` +
+        (fileEntry ? ` ${fileTypeClass(fileEntry.extension)}` : "") +
+        (folderNote ? " hn-kind-folder-note" : ""),
+      attr: { href: entry.path },
+    });
+    row.appendChild(
+      folderEntry
+        ? folderNote
+          ? Icons.folderNote()
+          : Icons.folder()
+        : fileTypeIcon((fileEntry as TFile).extension),
+    );
+    row.appendChild(
+      el("span", {
+        cls: "hn-index-name",
+        text: folderEntry ? folderEntry.name : (fileEntry as TFile).basename,
+      }),
+    );
+    row.appendChild(
+      el("span", {
+        cls: "hn-index-meta",
+        text: folderEntry
+          ? `${folderEntry.children?.length ?? 0}${ITEM_SUFFIX}`
+          : relativeTime((fileEntry as TFile).stat?.mtime ?? 0),
+      }),
+    );
+    row.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      openTarget(plugin, folderNote ?? entry);
+    });
+    body.appendChild(row);
+  }
+  inner.appendChild(body);
+  root.appendChild(inner);
+
+  return root;
+}

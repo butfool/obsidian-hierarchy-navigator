@@ -14,9 +14,14 @@ import {
 import { HierarchyNavigatorSettingTab } from "./settingTab";
 import {
   renderHierarchyBlock,
+  renderBodyIndex,
+  isNoteBodyEmpty,
+  isRawBodyEmpty,
   refitSections,
   isEligible,
   BLOCK_CLASS,
+  INDEX_CLASS,
+  OWNED_SELECTOR,
 } from "./renderer";
 
 const PLUGIN_NAME = "Hierarchy Navigator";
@@ -82,6 +87,20 @@ export default class HierarchyNavigator
       }),
     );
 
+    // Belt and braces for the reading/editing split: if an overlay ever
+    // survives a mode switch (no `layout-change`), clicking into the editor
+    // still clears it. The overlay must never sit over the caret.
+    this.registerDomEvent(document, "focusin", (ev) => {
+      const target = ev.target as HTMLElement | null;
+      if (!target?.closest?.(".cm-editor")) return;
+      const pane = target.closest<HTMLElement>(".workspace-leaf-content");
+      const overlay = pane?.querySelector<HTMLElement>(`.${INDEX_CLASS}`);
+      if (!overlay) return;
+      this.indexObservers.get(overlay)?.disconnect();
+      this.indexObservers.delete(overlay);
+      overlay.remove();
+    });
+
     // Initial mount for the leaf already open at plugin load time.
     this.syncAllOpenLeaves();
 
@@ -136,7 +155,7 @@ export default class HierarchyNavigator
     // reloading the plugin doesn't accumulate duplicates if hot-reload
     // doesn't fully reinstantiate Obsidian's view tree.
     this.iterateMarkdownViews((view) => {
-      view.contentEl.querySelectorAll(`.${BLOCK_CLASS}`).forEach((n) => n.remove());
+      this.removeOwned(view.contentEl);
     });
   }
 
@@ -177,20 +196,23 @@ export default class HierarchyNavigator
     // Eligibility check first — if the note opted out, *remove* any
     // stale block from a previous mount.
     if (!isEligible(this, file)) {
-      view.contentEl.querySelectorAll(`.${BLOCK_CLASS}`).forEach((n) => n.remove());
+      this.removeOwned(view.contentEl);
       return;
     }
 
     // Always start clean: there's at most ONE block per view, period.
-    view.contentEl.querySelectorAll(`.${BLOCK_CLASS}`).forEach((n) => n.remove());
+    this.removeOwned(view.contentEl);
 
     const block = renderHierarchyBlock(this, file);
 
-    {
-      // The block sits directly below the note's large title, not above it.
-      // Prefer the rendered H1, then Obsidian's inline-title fallback.
-      // This keeps the hierarchy chrome attached to the document title
-      // while leaving Properties and the body in their natural order.
+    // The block sits directly below the note's large title, not above it.
+    // Prefer the rendered H1, then Obsidian's inline-title fallback. This
+    // keeps the hierarchy chrome attached to the document title while leaving
+    // Properties and the body in their natural order.
+    //
+    // Returns false only when nothing was placed because the title has not
+    // rendered yet; the caller then retries on the next frame.
+    const placeChrome = (): boolean => {
       const title = view.contentEl.querySelector<HTMLElement>(
         ".inline-title, :scope h1",
       );
@@ -201,9 +223,10 @@ export default class HierarchyNavigator
         const metadata = view.contentEl.querySelector<HTMLElement>(
           ".metadata-container, .metadata-properties",
         );
-        if (metadata?.parentElement) {
-          metadata.parentElement.insertBefore(block, metadata);
-          return;
+        const metadataParent = metadata?.parentElement;
+        if (metadata && metadataParent) {
+          metadataParent.insertBefore(block, metadata);
+          return true;
         }
 
         // Editor without properties: sit directly before the editable
@@ -214,7 +237,7 @@ export default class HierarchyNavigator
         );
         if (sizer && cmContent) {
           sizer.insertBefore(block, cmContent);
-          return;
+          return true;
         }
 
         // Reading view without properties: after the title's top-level row.
@@ -229,44 +252,133 @@ export default class HierarchyNavigator
           titleRow = titleRow.parentElement;
         }
         titleRow.insertAdjacentElement("afterend", block);
-      } else {
-        // The title is rendered asynchronously on first open. Give Obsidian
-        // one frame to add it before choosing a fallback insertion point.
-        if (!this.pendingTitleRetries.has(leaf)) {
-          this.pendingTitleRetries.add(leaf);
-          window.requestAnimationFrame(() => {
-            this.pendingTitleRetries.delete(leaf);
-            if (view.file === file) {
-              this.mountInto(leaf);
-            }
-          });
-          return;
-        }
-
-        // Some themes hide the inline title entirely. Keep the navigation
-        // before Properties (or before the editor content) without putting
-        // it ahead of a title rendered later in the same view.
-        const fallbackSizer = view.contentEl.querySelector<HTMLElement>(".cm-sizer");
-        const fallbackContent = fallbackSizer?.querySelector<HTMLElement>(
-          ":scope > .cm-contentContainer",
-        );
-        if (fallbackSizer && fallbackContent) {
-          fallbackSizer.insertBefore(block, fallbackContent);
-          return;
-        }
-        const contentRoot =
-          view.contentEl.querySelector<HTMLElement>(".markdown-preview-sizer") ??
-          view.contentEl;
-        const firstContent = contentRoot.querySelector<HTMLElement>(
-          ":scope > :not(.hn-root)",
-        );
-        if (firstContent) {
-          contentRoot.insertBefore(block, firstContent);
-        } else {
-          contentRoot.appendChild(block);
-        }
+        return true;
       }
+
+      // The title is rendered asynchronously on first open. Give Obsidian one
+      // frame to add it before choosing a fallback insertion point.
+      if (!this.pendingTitleRetries.has(leaf)) {
+        this.pendingTitleRetries.add(leaf);
+        window.requestAnimationFrame(() => {
+          this.pendingTitleRetries.delete(leaf);
+          if (view.file === file) {
+            this.mountInto(leaf);
+          }
+        });
+        return false;
+      }
+
+      // Some themes hide the inline title entirely. Keep the navigation
+      // before Properties (or before the editor content) without putting it
+      // ahead of a title rendered later in the same view.
+      const fallbackSizer = view.contentEl.querySelector<HTMLElement>(".cm-sizer");
+      const fallbackContent = fallbackSizer?.querySelector<HTMLElement>(
+        ":scope > .cm-contentContainer",
+      );
+      if (fallbackSizer && fallbackContent) {
+        fallbackSizer.insertBefore(block, fallbackContent);
+        return true;
+      }
+      const contentRoot =
+        view.contentEl.querySelector<HTMLElement>(".markdown-preview-sizer") ??
+        view.contentEl;
+      const firstContent = contentRoot.querySelector<HTMLElement>(
+        ":scope > :not(.hn-root):not(.hn-index)",
+      );
+      if (firstContent) {
+        contentRoot.insertBefore(block, firstContent);
+      } else {
+        contentRoot.appendChild(block);
+      }
+      return true;
+    };
+
+    if (!placeChrome()) return;
+
+    // The body index is an overlay over the note body rather than a node in
+    // it: nothing reflows when it appears, and nothing moves when it leaves.
+    this.mountBodyIndex(view, file);
+  }
+
+  /* ────────────────────────────────────────────────
+     Body index overlay
+     ──────────────────────────────────────────────── */
+
+  /** Overlays that follow their header block's height. */
+  private indexObservers = new WeakMap<HTMLElement, ResizeObserver>();
+
+  /**
+   * Mount the body index, but only while the note body is empty. An overlay
+   * over a note that *has* a body would hide the thing the user came to read.
+   */
+  private mountBodyIndex(view: MarkdownView, file: TFile): void {
+    // Reading mode only. An overlay is for a page you are *looking* at: put it
+    // over the editor and it covers what you are writing, so editing mode
+    // simply never gets one.
+    if (view.getMode() !== "preview") return;
+
+    const empty = isNoteBodyEmpty(this, file);
+    if (empty === false) return;
+    if (empty === true) {
+      this.attachBodyIndex(view, file);
+      return;
     }
+    // Metadata cache not built yet — brand-new notes land here. Read the text
+    // rather than guessing: a wrong "empty" drops a panel over real writing,
+    // and a wrong "not empty" silently loses the launcher on a blank page.
+    void this.app.vault.cachedRead(file).then((text) => {
+      if (view.file !== file) return;
+      if (!isRawBodyEmpty(text)) return;
+      this.attachBodyIndex(view, file);
+    });
+  }
+
+  /** Build the overlay, hang it in the pane, and keep it under the chrome. */
+  private attachBodyIndex(view: MarkdownView, file: TFile): void {
+    const overlay = renderBodyIndex(this, file);
+    if (!overlay) return;
+
+    const host = view.contentEl;
+    // The overlay is positioned against the pane, not the document.
+    if (getComputedStyle(host).position === "static") {
+      host.style.position = "relative";
+    }
+    host.appendChild(overlay);
+
+    const chrome = host.querySelector<HTMLElement>(`.${BLOCK_CLASS}`);
+    const fit = () => {
+      if (!overlay.isConnected) return;
+      // Anchor to whatever marks the end of the chrome, and fall back to a
+      // sane offset so a missing header block can never make the overlay
+      // cover the title.
+      const anchor =
+        chrome?.isConnected
+          ? chrome.getBoundingClientRect().bottom
+          : host.querySelector<HTMLElement>(".inline-title, :scope h1")
+              ?.getBoundingClientRect().bottom ?? null;
+      const top =
+        anchor === null ? 120 : anchor - host.getBoundingClientRect().top;
+      overlay.style.setProperty("top", `${Math.max(0, Math.round(top)) + 14}px`);
+    };
+    fit();
+    window.requestAnimationFrame(fit);
+
+    // Folding a section, resizing the pane, or letting the chips wrap all
+    // change how tall the chrome is — the overlay has to follow it.
+    if (chrome && typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(fit);
+      observer.observe(chrome);
+      this.indexObservers.set(overlay, observer);
+    }
+  }
+
+  /** Remove everything this plugin owns in a container, observers included. */
+  private removeOwned(host: HTMLElement): void {
+    host.querySelectorAll<HTMLElement>(OWNED_SELECTOR).forEach((node) => {
+      this.indexObservers.get(node)?.disconnect();
+      this.indexObservers.delete(node);
+      node.remove();
+    });
   }
 
   /** Walk every markdown leaf and (re-)mount if it's a preview leaf. */

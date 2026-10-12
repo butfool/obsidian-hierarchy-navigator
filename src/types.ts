@@ -13,6 +13,12 @@ export interface HierarchyNavigatorSettings {
   showFiles: boolean;
   /** Show siblings (same folder as the current file). Includes self. */
   showSiblings: boolean;
+  /**
+   * Render the Children index block in the note body, below the header
+   * block. It lists the same children as the header's Children row, but
+   * as a full collection view with per-item metadata.
+   */
+  showBodyIndex: boolean;
 
   /* ── Layout ── */
   /**
@@ -41,6 +47,7 @@ export const DEFAULT_SETTINGS: HierarchyNavigatorSettings = {
   showFolders: true,
   showFiles: true,
   showSiblings: false,
+  showBodyIndex: true,
   sectionLayout: "single-line",
   maxVisibleItems: 6,
   collapsed: false,

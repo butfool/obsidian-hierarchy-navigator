@@ -126,6 +126,14 @@ export const Icons = {
   hash: (): SVGElement => wrap(`
     <path d="M4 9h16M4 15h16M10 4l-2 16M16 4l-2 16"/>
   `),
+
+  /** Grid — the body index's own marker (it is a collection view, not a row). */
+  grid: (): SVGElement => wrap(`
+    <rect x="3.5" y="3.5" width="7" height="7" rx="2"/>
+    <rect x="13.5" y="3.5" width="7" height="7" rx="2"/>
+    <rect x="3.5" y="13.5" width="7" height="7" rx="2"/>
+    <rect x="13.5" y="13.5" width="7" height="7" rx="2"/>
+  `),
 };
 
 /* ────────────────────────────────────────────────

@@ -11,6 +11,7 @@ A non-invasive Obsidian plugin that renders a **parent / siblings / children nav
 - **Obsidian-openable files only.** Extensions are checked against the app's own view registry (`viewRegistry.getTypeByExtension`), so scripts, `.DS_Store`, and other unsupported formats never show up.
 - **Folders before files.** Every row sorts folders ahead of files, then by name in natural order (`9` sorts before `10`). A Folder Note sorts as the folder it stands for, and the vault's own interleaved order is never trusted — the folders you navigate by stay at the front of the row, and are the last thing pushed into the `+N` panel.
 - **File-type icons.** A pill's glyph says what the file *is* at a glance — note, Canvas, Base, PDF, image, audio, video, code/markup (HTML, CSS, JS, JSON, …) or a generic file — tinted per family with Obsidian's own theme colours. See [File-type icons](#-file-type-icons).
+- **A children index in the note body.** Below the header block, this note's children also appear as a collection you can actually read: folders as tiles with their item counts, files as rows with their last-modified time. It uses the *text* font and text size — so it reads as note content, not as navigation chrome — and scrolls inside itself past ~half a pane. The `隐藏` button dismisses it, and that dismissal lasts only for the current session: reopening the note brings it back. Nothing is written anywhere.
 - **One line or several.** Every section caps at the configured number of items and folds the rest into a “+N” peek panel; the cap holds across all rows. Keep each section on a single line — items the row cannot fit move into the panel rather than being cut off at the edge — or let it wrap onto as many lines as it needs. Hover or click the chip to unfold the panel: it fades in while its items cascade, and dismisses itself the moment the pointer leaves, on `Esc`, or on a click anywhere else.
 - **Click to collapse.** Click the Hierarchy header to fold the whole block away while you write; the state is remembered across notes.
 - **Homepage aware.** When the parent would be the vault root, the Parent row shows the note configured in the [Homepage plugin](https://github.com/novov/obsidian-homepage) with a dedicated house icon — one click back to your homepage. The row is hidden entirely at the root when no homepage is configured, or while you are already on the homepage.
@@ -75,8 +76,23 @@ Open **Settings → Hierarchy Navigator** to configure:
 | Show files | toggle | on |
 | Section layout | Single line / Multiple lines | Single line |
 | Max items per section | number | 6 |
+| Show a children index in the note body | toggle | on |
 
 The block always renders at the top of the note, always covers every `.md` file, and always lists one level of children — those used to be settings; they are now simply how the plugin behaves.
+
+## 📑 The body index
+
+While a note's **body is empty** and you are **reading** it, the plugin lays a children index over the page: folders first with their item counts, files with their last-modified time (relative, then a plain date). It is the "nothing here yet" page — one calm, roomy list, not a dashboard.
+
+- **It is an overlay, not a block.** It hangs over the body area, below the header rail, rather than being inserted into the document. That buys three things:
+  - nothing reflows when it appears or leaves — the text never moves a pixel (measured: the first line keeps the same y);
+  - it needs no cooperation from the editor, Properties, or a theme's grid rules — a vault using `cssclasses: list-cards` is fine;
+  - the header rail is never touched by it.
+- **Empty body only.** Whitespace, or frontmatter and nothing else — **frontmatter is not body text**, so a folder note that is only properties still counts as empty. A note with real content never gets the overlay: it would hide the thing you came to read.
+- **Reading mode only.** Switch the note to editing and the launcher is simply not there — an overlay has no business covering the paragraph you are writing. There is no dismiss button and no state to keep: the mode *is* the switch. (If an overlay ever survived a mode change, clicking into the editor clears it.)
+- **Its own scroll.** The list scrolls inside the overlay, so a 300-entry folder cannot push anything around.
+
+The block lives in the pane content element and is anchored to the bottom edge of the header block (a `ResizeObserver` keeps it there when sections fold, chips wrap, or the pane resizes). Class names are `hn-index` / `hn-index-head` / `hn-index-row`, so a theme can restyle it without touching the header rail.
 
 ## 🎨 File-type icons
 

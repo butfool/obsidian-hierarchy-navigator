@@ -244,7 +244,8 @@
 
 /* Folder Note = folder that opens as a note: same shape as a folder,
    tinted so it stands apart from plain folders. */
-.hn-pill.hn-kind-folder-note svg {
+.hn-pill.hn-kind-folder-note svg,
+.hn-index .hn-kind-folder-note svg {
   color: var(--text-accent);
   opacity: 0.9;
 }
@@ -262,44 +263,52 @@
    class (`hn-type-<family>`) so a theme can retint or flatten them.
    Theme colors come first, with a fixed fallback for themes that do
    not define them. */
-.hn-pill.hn-type-pdf svg {
+.hn-pill.hn-type-pdf svg,
+.hn-index .hn-type-pdf svg {
   color: var(--color-red, #e5604b);
   opacity: 0.95;
 }
 
-.hn-pill.hn-type-image svg {
+.hn-pill.hn-type-image svg,
+.hn-index .hn-type-image svg {
   color: var(--color-green, #3aa675);
   opacity: 0.95;
 }
 
-.hn-pill.hn-type-canvas svg {
+.hn-pill.hn-type-canvas svg,
+.hn-index .hn-type-canvas svg {
   color: var(--color-orange, #e08a3c);
   opacity: 0.95;
 }
 
-.hn-pill.hn-type-base svg {
+.hn-pill.hn-type-base svg,
+.hn-index .hn-type-base svg {
   color: var(--color-cyan, #2fa4b3);
   opacity: 0.95;
 }
 
-.hn-pill.hn-type-video svg {
+.hn-pill.hn-type-video svg,
+.hn-index .hn-type-video svg {
   color: var(--color-purple, #8b6ce0);
   opacity: 0.95;
 }
 
-.hn-pill.hn-type-audio svg {
+.hn-pill.hn-type-audio svg,
+.hn-index .hn-type-audio svg {
   color: var(--color-pink, #dd6ba0);
   opacity: 0.95;
 }
 
-.hn-pill.hn-type-code svg {
+.hn-pill.hn-type-code svg,
+.hn-index .hn-type-code svg {
   color: var(--color-blue, #4a7ddb);
   opacity: 0.95;
 }
 
 /* Notes are the default reading context: keep them neutral so the
    tinted families actually stand out. */
-.hn-pill.hn-type-note svg {
+.hn-pill.hn-type-note svg,
+.hn-index .hn-type-note svg {
   color: var(--hn-text-muted);
   opacity: 0.7;
 }
@@ -416,4 +425,127 @@
 @media (max-width: 520px) {
   .hn-segment-label { display: none; }
   .hn-segment + .hn-segment::before { display: none; }
+}
+
+/* ══════════════════════════════════════════════════
+   Body index — an overlay over the note body.
+
+   It is *not* part of the document flow: `main.ts` gives it a `top`
+   (the bottom edge of the header block) and hangs it in the pane's
+   content element. An empty note has nothing to push around, and when
+   the first keystroke retires the overlay, the text does not move.
+
+   Visually it is a launcher page, not a panel: the note's own
+   background, the text font at text size, one calm list, no cards.
+   ══════════════════════════════════════════════════ */
+
+.hn-index {
+  /* Not inside `.hn-root`, so it carries its own copy of the tokens. */
+  --hn-border: var(--background-modifier-border, rgba(127, 127, 127, 0.18));
+  --hn-text-muted: var(--text-muted);
+
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: 0; /* overwritten inline once the header block has been measured */
+  z-index: 5;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  display: flex;
+  justify-content: center;
+
+  background: var(--background-primary);
+  font-family: var(--font-text, var(--font-interface));
+  font-size: var(--font-text-size, 1em);
+  line-height: 1.5;
+  color: var(--text-normal);
+  transition: opacity 160ms ease;
+}
+
+.hn-index.is-hiding {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hn-index-inner {
+  width: 100%;
+  max-width: 620px;
+  padding: 7vh 26px 48px;
+}
+
+/* ── Head: label, counts, dismiss ── */
+.hn-index-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding-bottom: 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--hn-border);
+}
+.hn-index-head svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  color: var(--hn-text-muted);
+  opacity: 0.7;
+}
+.hn-index-title {
+  font-size: 0.8em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hn-text-muted);
+  white-space: nowrap;
+}
+.hn-index-count {
+  font-size: 0.82em;
+  color: var(--hn-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hn-index-spacer { flex: 1 1 auto; }
+
+/* ── The list: one row per entry, folders first, generous rhythm ── */
+.hn-index-body { display: grid; gap: 1px; }
+
+.hn-index-row {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 2.35em;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+.hn-index-row:hover { background: var(--background-modifier-hover); }
+.hn-index-row:focus-visible { outline: 2px solid var(--text-accent); outline-offset: -1px; }
+.hn-index-row svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  color: var(--hn-text-muted);
+  opacity: 0.8;
+}
+
+.hn-index-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hn-index-dir .hn-index-name { font-weight: 600; }
+.hn-index-meta {
+  font-size: 0.88em;
+  color: var(--hn-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hn-index { transition: none; }
 }
