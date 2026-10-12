@@ -21,7 +21,9 @@ import {
   isRawBodyEmpty,
   refitSections,
   isEligible,
+  chromeBottom,
   BLOCK_CLASS,
+  CHROME_SELECTOR,
   INDEX_CLASS,
   OWNED_SELECTOR,
 } from "./renderer";
@@ -369,17 +371,15 @@ export default class HierarchyNavigator
     }
     host.appendChild(overlay);
 
-    const chrome = host.querySelector<HTMLElement>(`.${BLOCK_CLASS}`);
     const fit = () => {
       if (!overlay.isConnected) return;
-      // Anchor to whatever marks the end of the chrome, and fall back to a
-      // sane offset so a missing header block can never make the overlay
+      // Anchor below everything the note already shows above its body — the
+      // navigation block *and* the Properties block. Properties are the note's
+      // own content; the overlay is opaque, so starting at the navigation
+      // block would hide them. Falls back to a fixed offset when nothing is
+      // measurable yet, so a missing header block can never make the overlay
       // cover the title.
-      const anchor =
-        chrome?.isConnected
-          ? chrome.getBoundingClientRect().bottom
-          : host.querySelector<HTMLElement>(".inline-title, :scope h1")
-              ?.getBoundingClientRect().bottom ?? null;
+      const anchor = chromeBottom(host);
       const top =
         anchor === null ? 120 : anchor - host.getBoundingClientRect().top;
       overlay.style.setProperty("top", `${Math.max(0, Math.round(top)) + 14}px`);
@@ -387,11 +387,14 @@ export default class HierarchyNavigator
     fit();
     window.requestAnimationFrame(fit);
 
-    // Folding a section, resizing the pane, or letting the chips wrap all
-    // change how tall the chrome is — the overlay has to follow it.
-    if (chrome && typeof ResizeObserver !== "undefined") {
+    // Folding a section, resizing the pane, letting the chips wrap, or
+    // expanding the Properties block all change how tall the chrome is — the
+    // overlay has to follow every one of them.
+    if (typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver(fit);
-      observer.observe(chrome);
+      host
+        .querySelectorAll<HTMLElement>(CHROME_SELECTOR)
+        .forEach((node) => observer.observe(node));
       this.indexObservers.set(overlay, observer);
     }
   }

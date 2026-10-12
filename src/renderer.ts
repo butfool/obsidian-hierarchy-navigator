@@ -745,6 +745,38 @@ export const INDEX_CLASS = "hn-index";
 /** Everything this plugin owns inside a view: header block + body overlay. */
 export const OWNED_SELECTOR = `.${BLOCK_CLASS}, .${INDEX_CLASS}`;
 
+/**
+ * What the body overlay has to stay below: our own navigation block, and the
+ * note's Properties block. Properties are the note's own content — the
+ * overlay is an opaque panel, so anchoring it to the navigation block alone
+ * would swallow them whole.
+ *
+ * The selector is exported so `main.ts` can observe exactly the elements it
+ * measured, instead of guessing at them a second time.
+ */
+export const CHROME_SELECTOR = `.${BLOCK_CLASS}, .metadata-container, .metadata-properties`;
+
+/**
+ * Bottom edge, in viewport coordinates, of the chrome the note renders above
+ * its body. Null when nothing measurable is there yet, so callers can fall
+ * back to a fixed offset rather than guess.
+ */
+export function chromeBottom(host: HTMLElement): number | null {
+  let bottom: number | null = null;
+  host.querySelectorAll<HTMLElement>(CHROME_SELECTOR).forEach((node) => {
+    // An embedded note or Base card renders its own Properties element. It
+    // belongs to that embed, not to the pane we are measuring.
+    if (node.closest(".markdown-embed, .internal-embed")) return;
+    // Hidden elements report an all-zero rect, which `max` ignores by itself.
+    const edge = node.getBoundingClientRect().bottom;
+    if (!Number.isFinite(edge)) return;
+    bottom = bottom === null ? edge : Math.max(bottom, edge);
+  });
+  if (bottom !== null) return bottom;
+  const title = host.querySelector<HTMLElement>(".inline-title, :scope h1");
+  return title ? title.getBoundingClientRect().bottom : null;
+}
+
 /** Frontmatter block at the very start of a note, for the raw-text fallback. */
 const FRONTMATTER_RE = /^\uFEFF?---\r?\n[\s\S]*?\r?\n---\r?\n?/;
 

@@ -98,15 +98,16 @@ Adding a language is one table: every string lives in [`src/i18n.ts`](src/i18n.t
 
 While a **Folder Note**'s body is empty and you are **reading** it, the plugin lays a children index over the page: folders first with their item counts, files with their last-modified time (relative, then a plain date). It is the "nothing here yet" page — one calm, roomy list, not a dashboard.
 
-- **It is an overlay, not a block.** It hangs over the body area, below the header rail, rather than being inserted into the document. That buys three things:
+- **It is an overlay, not a block.** It hangs over the body area, below the header rail and below Properties, rather than being inserted into the document. That buys three things:
   - nothing reflows when it appears or leaves — the text never moves a pixel (measured: the first line keeps the same y);
   - it needs no cooperation from the editor, Properties, or a theme's grid rules — a vault using `cssclasses: list-cards` is fine;
   - the header rail is never touched by it.
+- **Properties stay visible.** Frontmatter does not count as body, so a note whose only content is properties still gets the launcher — but the launcher is an opaque panel, so its top edge is measured from the bottom of the **Properties block**, not from the rail. Properties are the note's own content; the index starts where that content stops, and follows it when the block grows. (A hidden Properties block measures as zero, and the index simply sits under the rail.)
 - **A Folder Note and an empty body.** Same gate as the Children row: only a note that stands for a folder has contents to index, and a folder with no children gets no overlay at all. Frontmatter is not body text, so a folder note that is only properties still counts as empty. A note with real content never gets the overlay: it would hide the thing you came to read.
 - **Reading mode only.** Switch the note to editing and the launcher is simply not there — an overlay has no business covering the paragraph you are writing. There is no dismiss button and no state to keep: the mode *is* the switch. (If an overlay ever survived a mode change, clicking into the editor clears it.)
 - **Its own scroll.** The list scrolls inside the overlay, so a 300-entry folder cannot push anything around.
 
-The block lives in the pane content element and is anchored to the bottom edge of the header block (a `ResizeObserver` keeps it there when sections fold, chips wrap, or the pane resizes). Class names are `hn-index` / `hn-index-head` / `hn-index-row`, so a theme can restyle it without touching the header rail.
+The block lives in the pane content element and is anchored to the bottom edge of the header block and the Properties block (a `ResizeObserver` keeps it there when sections fold, chips wrap, Properties grow, or the pane resizes). Class names are `hn-index` / `hn-index-head` / `hn-index-row`, so a theme can restyle it without touching the header rail.
 
 ## 🎨 File-type icons
 

@@ -419,9 +419,14 @@
    Body index — an overlay over the note body.
 
    It is *not* part of the document flow: `main.ts` gives it a `top`
-   (the bottom edge of the header block) and hangs it in the pane's
+   (the bottom edge of everything the note shows above its body — the
+   header block and the Properties block) and hangs it in the pane's
    content element. An empty note has nothing to push around, and when
    the first keystroke retires the overlay, the text does not move.
+
+   Properties are the note's own content, so the overlay starts below
+   them: it is opaque, and anchoring it to the header block alone would
+   swallow them whole.
 
    Visually it is a launcher page, not a panel: the note's own
    background, the text font at text size, one calm list, no cards.
