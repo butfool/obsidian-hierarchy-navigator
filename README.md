@@ -15,7 +15,7 @@ A non-invasive Obsidian plugin that renders a **parent / siblings / children nav
 - **One line or several.** Every section caps at the configured number of items and folds the rest into a “+N” peek panel; the cap holds across all rows. Keep each section on a single line — items the row cannot fit move into the panel rather than being cut off at the edge — or let it wrap onto as many lines as it needs. Hover or click the chip to unfold the panel: it fades in while its items cascade, and dismisses itself the moment the pointer leaves, on `Esc`, or on a click anywhere else.
 - **Click to collapse.** Click the Hierarchy header to fold the whole block away while you write; the state is remembered across notes.
 - **Homepage aware.** When the parent would be the vault root, the Parent row shows the note configured in the [Homepage plugin](https://github.com/novov/obsidian-homepage) with a dedicated house icon — one click back to your homepage. The row is hidden entirely at the root when no homepage is configured, or while you are already on the homepage.
-- **Direct children only.** The Children row lists what is actually inside the folder (one level), which is what the Parent / Siblings rows navigate back out of.
+- **Children belong to folders, not to files.** A plain note is a leaf, so its Children row is empty — its folder's other entries are its *siblings*, and repeating them under Children would just be the Siblings row twice. Only a Folder Note stands for a folder, and only then does Children list that folder's contents (one level) — the entries the Parent / Siblings rows navigate back out of.
 - **Native Obsidian theming.** Uses CSS variables for every color so it adapts automatically to light / dark / custom themes.
 - **Settings tab.** Header label, max items per row, and a toggle per section.
 - **Frontmatter opt-out.** Add `hierarchy-nav: hide` to skip a single note.
@@ -82,13 +82,13 @@ The block always renders at the top of the note, always covers every `.md` file,
 
 ## 📑 The body index
 
-While a note's **body is empty** and you are **reading** it, the plugin lays a children index over the page: folders first with their item counts, files with their last-modified time (relative, then a plain date). It is the "nothing here yet" page — one calm, roomy list, not a dashboard.
+While a **Folder Note**'s body is empty and you are **reading** it, the plugin lays a children index over the page: folders first with their item counts, files with their last-modified time (relative, then a plain date). It is the "nothing here yet" page — one calm, roomy list, not a dashboard.
 
 - **It is an overlay, not a block.** It hangs over the body area, below the header rail, rather than being inserted into the document. That buys three things:
   - nothing reflows when it appears or leaves — the text never moves a pixel (measured: the first line keeps the same y);
   - it needs no cooperation from the editor, Properties, or a theme's grid rules — a vault using `cssclasses: list-cards` is fine;
   - the header rail is never touched by it.
-- **Empty body only.** Whitespace, or frontmatter and nothing else — **frontmatter is not body text**, so a folder note that is only properties still counts as empty. A note with real content never gets the overlay: it would hide the thing you came to read.
+- **A Folder Note and an empty body.** Same gate as the Children row: only a note that stands for a folder has contents to index. Frontmatter is not body text, so a folder note that is only properties still counts as empty. A note with real content never gets the overlay: it would hide the thing you came to read.
 - **Reading mode only.** Switch the note to editing and the launcher is simply not there — an overlay has no business covering the paragraph you are writing. There is no dismiss button and no state to keep: the mode *is* the switch. (If an overlay ever survived a mode change, clicking into the editor clears it.)
 - **Its own scroll.** The list scrolls inside the overlay, so a 300-entry folder cannot push anything around.
 

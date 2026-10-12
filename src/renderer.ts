@@ -599,16 +599,20 @@ export function renderHierarchyBlock(
         items: [],
       };
     }
-    if (!(hierarchyFolder instanceof TFolder) || hierarchyFolder.path === ROOT) {
+    // A plain note is a leaf: it has no children of its own, and its
+    // siblings are not its children — the Siblings row already covers those.
+    // Only a Folder Note stands for a folder, and only then is there contents
+    // to navigate into.
+    if (!(logicalFolder instanceof TFolder)) {
       return {
         label: "Children",
         icon: Icons.chevronDown(),
-        emptyText: "根目录",
+        emptyText: "（无）",
         items: [],
       };
     }
     const collected: Entry[] = [];
-    collectLogicalChildren(plugin, hierarchyFolder, collected);
+    collectLogicalChildren(plugin, logicalFolder, collected);
     const filtered = collected.filter((entry) => {
       if (entry.path === file.path) return false;
       return entry instanceof TFolder ? settings.showFolders : settings.showFiles;
@@ -813,10 +817,10 @@ export function renderBodyIndex(
   if (!plugin.settings.showBodyIndex) return null;
   if (!plugin.settings.showFolders && !plugin.settings.showFiles) return null;
 
-  // Same logical folder the header block navigates: a Folder Note stands in
-  // for its folder, so its index lists what that folder contains.
-  const logicalFolder = logicalFolderForFile(plugin, file);
-  const folder = logicalFolder ?? file.parent;
+  // Same rule as the header block: only a Folder Note stands for a folder, so
+  // only a Folder Note has contents to index. A plain note is a leaf — listing
+  // its folder's other entries here would just repeat the Siblings row.
+  const folder = logicalFolderForFile(plugin, file);
   if (!(folder instanceof TFolder) || folder.path === ROOT) return null;
 
   const collected: Entry[] = [];
