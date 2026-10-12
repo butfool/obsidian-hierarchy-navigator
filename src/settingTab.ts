@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
-import type { HierarchyNavigatorPlugin } from "./types";
+import type { HierarchyNavigatorPlugin, Locale } from "./types";
+import { getStrings, LANGUAGES } from "./i18n";
 
 export class HierarchyNavigatorSettingTab extends PluginSettingTab {
   private plugin: HierarchyNavigatorPlugin;
@@ -19,36 +20,45 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
+    // Every label on this page comes from the same language table the block
+    // itself uses, so the tab is in whatever language the plugin is set to.
+    const t = getStrings(this.plugin.settings.language).settings;
+
     containerEl.createEl("h2", { text: "Hierarchy Navigator" });
-    containerEl.createEl("p", {
-      text:
-        "Display a parent / siblings / children navigation block at the top of " +
-        "any note. Source files are never modified.",
-    });
+    containerEl.createEl("p", { text: t.intro });
+
+    // Language first: it is the setting that decides how this very page reads,
+    // so changing it re-renders the tab on the spot.
+    new Setting(containerEl)
+      .setName(t.languageName)
+      .setDesc(t.languageDesc)
+      .addDropdown((d) => {
+        for (const { value, label } of LANGUAGES) d.addOption(value, label);
+        d.setValue(this.plugin.settings.language);
+        d.onChange(async (v) => {
+          this.plugin.settings.language = v as Locale;
+          await this.persist();
+          this.display();
+        });
+      });
 
     new Setting(containerEl)
-      .setName("Header label")
-      .setDesc(
-        "Short label shown above the block. Falls back to 'Hierarchy' if empty.",
-      )
-      .addText((t) => {
-        t.setValue(this.plugin.settings.headerTitle);
-        t.onChange(async (v) => {
+      .setName(t.headerLabelName)
+      .setDesc(t.headerLabelDesc)
+      .addText((txt) => {
+        txt.setValue(this.plugin.settings.headerTitle);
+        txt.onChange(async (v) => {
           this.plugin.settings.headerTitle = v.trim();
           await this.persist();
         });
       });
 
     /* ── Sections ── */
-    containerEl.createEl("h3", { text: "Sections" });
+    containerEl.createEl("h3", { text: t.sectionsHeading });
 
     new Setting(containerEl)
-      .setName("Show parent folder")
-      .setDesc(
-        "Render the folder containing this note. At the vault root the " +
-          "homepage note (Homepage plugin) is shown instead; the row is " +
-          "hidden when neither applies.",
-      )
+      .setName(t.showParentName)
+      .setDesc(t.showParentDesc)
       .addToggle((tg) => {
         tg.setValue(this.plugin.settings.showParent);
         tg.onChange(async (v) => {
@@ -58,12 +68,8 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("Show siblings")
-      .setDesc(
-        "Render the notes and folders next to the current one. The current " +
-          "node — the file itself, or the folder a Folder Note stands for — " +
-          "is never listed, since you are already there.",
-      )
+      .setName(t.showSiblingsName)
+      .setDesc(t.showSiblingsDesc)
       .addToggle((tg) => {
         tg.setValue(this.plugin.settings.showSiblings);
         tg.onChange(async (v) => {
@@ -73,8 +79,8 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("Show folders")
-      .setDesc("Render folder entries, in the children list and the siblings row.")
+      .setName(t.showFoldersName)
+      .setDesc(t.showFoldersDesc)
       .addToggle((tg) => {
         tg.setValue(this.plugin.settings.showFolders);
         tg.onChange(async (v) => {
@@ -84,8 +90,8 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("Show files")
-      .setDesc("Render file entries, in the children list and the siblings row.")
+      .setName(t.showFilesName)
+      .setDesc(t.showFilesDesc)
       .addToggle((tg) => {
         tg.setValue(this.plugin.settings.showFiles);
         tg.onChange(async (v) => {
@@ -95,18 +101,14 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       });
 
     /* ── Layout ── */
-    containerEl.createEl("h3", { text: "Layout" });
+    containerEl.createEl("h3", { text: t.layoutHeading });
 
     new Setting(containerEl)
-      .setName("Section layout")
-      .setDesc(
-        "Single line keeps each section one row tall, so items the row can't " +
-          "fit stay hidden behind the “+N” panel. Multiple lines let a " +
-          "section use as many rows as its items need.",
-      )
+      .setName(t.sectionLayoutName)
+      .setDesc(t.sectionLayoutDesc)
       .addDropdown((d) => {
-        d.addOption("single-line", "Single line");
-        d.addOption("wrap", "Multiple lines");
+        d.addOption("single-line", t.sectionLayoutSingle);
+        d.addOption("wrap", t.sectionLayoutWrap);
         d.setValue(this.plugin.settings.sectionLayout);
         d.onChange(async (v) => {
           this.plugin.settings.sectionLayout = v as "single-line" | "wrap";
@@ -115,18 +117,13 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("Max items per section")
-      .setDesc(
-        "Most items shown per section; the rest collapse into a “+N” panel. " +
-          "In multiple-line layout this caps all rows together. On a single " +
-          "line the row may show fewer, because anything that does not fit " +
-          "the pane width moves into that same panel instead of being cut off.",
-      )
-      .addText((t) => {
-        t.inputEl.type = "number";
-        t.inputEl.min = "1";
-        t.setValue(String(this.plugin.settings.maxVisibleItems));
-        t.onChange(async (v) => {
+      .setName(t.maxItemsName)
+      .setDesc(t.maxItemsDesc)
+      .addText((txt) => {
+        txt.inputEl.type = "number";
+        txt.inputEl.min = "1";
+        txt.setValue(String(this.plugin.settings.maxVisibleItems));
+        txt.onChange(async (v) => {
           const n = Number.parseInt(v, 10);
           if (!Number.isFinite(n) || n < 1) return;
           this.plugin.settings.maxVisibleItems = n;
@@ -135,19 +132,11 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       });
 
     /* ── Body index ── */
-    containerEl.createEl("h3", { text: "Body index" });
+    containerEl.createEl("h3", { text: t.bodyIndexHeading });
 
     new Setting(containerEl)
-      .setName("Show a children index in the note body")
-      .setDesc(
-        "While the note body is empty — whitespace, or frontmatter and " +
-          "nothing else — lay a children index over it: folders first with " +
-          "their item counts, files with their last modified time. It is an " +
-          "overlay, not part of the document: nothing reflows when it appears, " +
-          "reading mode only: switch the note to editing and it is simply not " +
-          "there, so it can never cover what you are writing. Nothing is " +
-          "written to disk and the header block is never touched.",
-      )
+      .setName(t.showBodyIndexName)
+      .setDesc(t.showBodyIndexDesc)
       .addToggle((tg) => {
         tg.setValue(this.plugin.settings.showBodyIndex);
         tg.onChange(async (v) => {
@@ -157,11 +146,7 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       });
 
     /* ── Tips ── */
-    containerEl.createEl("h3", { text: "Tips" });
-    containerEl.createEl("p", {
-      text:
-        "Add `hierarchy-nav: hide` to a note's frontmatter to exclude it from " +
-        "this plugin entirely.",
-    });
+    containerEl.createEl("h3", { text: t.tipsHeading });
+    containerEl.createEl("p", { text: t.tips });
   }
 }

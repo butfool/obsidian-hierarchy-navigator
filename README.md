@@ -11,13 +11,15 @@ A non-invasive Obsidian plugin that renders a **parent / siblings / children nav
 - **Obsidian-openable files only.** Extensions are checked against the app's own view registry (`viewRegistry.getTypeByExtension`), so scripts, `.DS_Store`, and other unsupported formats never show up.
 - **Folders before files.** Every row sorts folders ahead of files, then by name in natural order (`9` sorts before `10`). A Folder Note sorts as the folder it stands for, and the vault's own interleaved order is never trusted — the folders you navigate by stay at the front of the row, and are the last thing pushed into the `+N` panel.
 - **File-type icons.** A pill's glyph says what the file *is* at a glance — note, Canvas, Base, PDF, image, audio, video, code/markup (HTML, CSS, JS, JSON, …) or a generic file — tinted per family with Obsidian's own theme colours. See [File-type icons](#-file-type-icons).
-- **A children index in the note body.** Below the header block, this note's children also appear as a collection you can actually read: folders as tiles with their item counts, files as rows with their last-modified time. It uses the *text* font and text size — so it reads as note content, not as navigation chrome — and scrolls inside itself past ~half a pane. The `隐藏` button dismisses it, and that dismissal lasts only for the current session: reopening the note brings it back. Nothing is written anywhere.
+- **A children index in the note body.** Below the header block, this note's children also appear as a collection you can actually read: folders as tiles with their item counts, files as rows with their last-modified time. It uses the *text* font and text size — so it reads as note content, not as navigation chrome — and scrolls inside itself past ~half a pane. Nothing is written anywhere.
+- **中文 / English.** Every piece of interface the plugin adds — the block labels, the body index, the two commands and this settings page — is translated. Switch under **Settings → Hierarchy Navigator → Language**; it applies immediately, with no reload and no effect on your notes.
+- **No empty rows.** A section with nothing to show is not rendered at all: a plain note has no Children row, a note alone in its folder has no Siblings row, and an empty folder's Folder Note has neither. The rows you see are always rows you can navigate.
 - **One line or several.** Every section caps at the configured number of items and folds the rest into a “+N” peek panel; the cap holds across all rows. Keep each section on a single line — items the row cannot fit move into the panel rather than being cut off at the edge — or let it wrap onto as many lines as it needs. Hover or click the chip to unfold the panel: it fades in while its items cascade, and dismisses itself the moment the pointer leaves, on `Esc`, or on a click anywhere else.
 - **Click to collapse.** Click the Hierarchy header to fold the whole block away while you write; the state is remembered across notes.
 - **Homepage aware.** When the parent would be the vault root, the Parent row shows the note configured in the [Homepage plugin](https://github.com/novov/obsidian-homepage) with a dedicated house icon — one click back to your homepage. The row is hidden entirely at the root when no homepage is configured, or while you are already on the homepage.
-- **Children belong to folders, not to files.** A plain note is a leaf, so its Children row is empty — its folder's other entries are its *siblings*, and repeating them under Children would just be the Siblings row twice. Only a Folder Note stands for a folder, and only then does Children list that folder's contents (one level) — the entries the Parent / Siblings rows navigate back out of.
+- **Children belong to folders, not to files.** A plain note is a leaf, so it has no Children row at all — its folder's other entries are its *siblings*, and repeating them under Children would just be the Siblings row twice. Only a Folder Note stands for a folder, and only then does Children list that folder's contents (one level) — the entries the Parent / Siblings rows navigate back out of.
 - **Native Obsidian theming.** Uses CSS variables for every color so it adapts automatically to light / dark / custom themes.
-- **Settings tab.** Header label, max items per row, and a toggle per section.
+- **Settings tab.** Language, header label, max items per row, and a toggle per section.
 - **Frontmatter opt-out.** Add `hierarchy-nav: hide` to skip a single note.
 
 [folder-note]: https://github.com/aidenlx/folder-note
@@ -69,6 +71,7 @@ Open **Settings → Hierarchy Navigator** to configure:
 
 | Setting | Options | Default |
 |---|---|---|
+| Language | 中文 / English | 中文 |
 | Header label | free text | `Hierarchy` |
 | Show parent folder | toggle | on |
 | Show siblings | toggle | off |
@@ -78,7 +81,18 @@ Open **Settings → Hierarchy Navigator** to configure:
 | Max items per section | number | 6 |
 | Show a children index in the note body | toggle | on |
 
-The block always renders at the top of the note, always covers every `.md` file, and always lists one level of children — those used to be settings; they are now simply how the plugin behaves.
+The block always renders at the top of the note, always covers every `.md` file, and always lists one level of children — those used to be settings; they are now simply how the plugin behaves. Rows with nothing in them are not rendered, so a section that would be empty simply isn't there.
+
+## 🌐 Language
+
+The plugin's own interface — the row labels, the body index, the `+N` chip's tooltip, both commands and the settings page — ships in **中文** and **English**. Change it under **Settings → Hierarchy Navigator → Language**; the block and the settings page switch on the spot, no reload.
+
+Two things it deliberately does *not* touch:
+
+- **your notes.** Nothing is ever written to a note, and no note text is translated.
+- **Obsidian's own UI.** That follows your Obsidian language setting, not this one.
+
+Adding a language is one table: every string lives in [`src/i18n.ts`](src/i18n.ts), typed by the `Strings` interface, so a missing key is a compile error rather than a blank label.
 
 ## 📑 The body index
 
@@ -88,7 +102,7 @@ While a **Folder Note**'s body is empty and you are **reading** it, the plugin l
   - nothing reflows when it appears or leaves — the text never moves a pixel (measured: the first line keeps the same y);
   - it needs no cooperation from the editor, Properties, or a theme's grid rules — a vault using `cssclasses: list-cards` is fine;
   - the header rail is never touched by it.
-- **A Folder Note and an empty body.** Same gate as the Children row: only a note that stands for a folder has contents to index. Frontmatter is not body text, so a folder note that is only properties still counts as empty. A note with real content never gets the overlay: it would hide the thing you came to read.
+- **A Folder Note and an empty body.** Same gate as the Children row: only a note that stands for a folder has contents to index, and a folder with no children gets no overlay at all. Frontmatter is not body text, so a folder note that is only properties still counts as empty. A note with real content never gets the overlay: it would hide the thing you came to read.
 - **Reading mode only.** Switch the note to editing and the launcher is simply not there — an overlay has no business covering the paragraph you are writing. There is no dismiss button and no state to keep: the mode *is* the switch. (If an overlay ever survived a mode change, clicking into the editor clears it.)
 - **Its own scroll.** The list scrolls inside the overlay, so a 300-entry folder cannot push anything around.
 
@@ -134,10 +148,10 @@ The plugin will skip that note.
 
 ## 🔌 Commands
 
-Two commands are registered (assign shortcuts via Settings → Hotkeys):
+Two commands are registered (assign shortcuts via Settings → Hotkeys). Their names follow the plugin's language setting:
 
-- **Reveal parent folder in file explorer**
-- **Open the first child file**
+- **Reveal parent folder in file explorer** — 在文件浏览器中定位父文件夹
+- **Open the first child file** — 打开第一个子文件
 
 ## 🪪 License
 

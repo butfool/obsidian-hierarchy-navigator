@@ -7,6 +7,7 @@ import type {
 } from "./types";
 import type HierarchyNavigator from "./main";
 import { Icons, fileTypeIcon, fileTypeClass } from "./icons";
+import { getStrings, type Strings } from "./i18n";
 
 const ROOT = "/";
 const FOLDER_NOTE_SUFFIX = ".md";
@@ -215,9 +216,11 @@ interface Segment {
   label: string;
   /** SVG icon placed to the LEFT of the label. */
   icon: SVGElement;
-  /** Empty-state text when there are no items. */
-  emptyText: string;
-  /** Items to render. */
+  /**
+   * Items to render. Never empty: a section without items is not a section,
+   * and the caller drops the row entirely rather than printing a placeholder
+   * — `buildSegment` relies on this.
+   */
   items: Array<{
     /** Resolve where to jump when this item is clicked. */
     target: TFile | TFolder;
@@ -415,7 +418,10 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
       });
       menu.replaceChildren(...pills);
       chip.textContent = `+${pills.length}`;
-      chip.setAttribute("title", `Show ${pills.length} more`);
+      chip.setAttribute(
+        "title",
+        getStrings(plugin.settings.language).overflowChip(pills.length),
+      );
       // Nothing left over: the chip takes no room at all.
       more.style.display = pills.length > 0 ? "" : "none";
       if (pills.length === 0) close();
@@ -449,74 +455,73 @@ function buildSegment(
   root.appendChild(head);
 
   const body = el("div", { cls: "hn-segment-body" });
-  if (seg.items.length === 0) {
-    body.appendChild(el("span", { cls: "hn-empty", text: seg.emptyText }));
-  } else {
-    // `maxVisibleItems` is the ceiling for a section; anything above it — and
-    // in a single line, anything the row cannot physically show — lives in
-    // the "+N" panel.
-    const cap = Math.max(
-      1,
-      Math.floor(plugin.settings.maxVisibleItems) || 1,
-    );
-    const pills = seg.items.map((it) => makePill(plugin, it));
-    const list = el("div", { cls: "hn-pills" });
-    body.appendChild(list);
-    const panel = makeOverflowMenu(plugin);
-    const wrap = plugin.settings.sectionLayout === "wrap";
-    // Wrapped sections put the chip inside the flowing row, so it trails the
-    // last pill; a single line keeps it outside, pinned after the row.
-    const chipHome = wrap ? list : body;
+  // A segment is only ever built when it has items — the caller drops an empty
+  // section rather than rendering a placeholder, so there is no empty case to
+  // handle here.
+  // `maxVisibleItems` is the ceiling for a section; anything above it — and
+  // in a single line, anything the row cannot physically show — lives in
+  // the "+N" panel.
+  const cap = Math.max(
+    1,
+    Math.floor(plugin.settings.maxVisibleItems) || 1,
+  );
+  const pills = seg.items.map((it) => makePill(plugin, it));
+  const list = el("div", { cls: "hn-pills" });
+  body.appendChild(list);
+  const panel = makeOverflowMenu(plugin);
+  const wrap = plugin.settings.sectionLayout === "wrap";
+  // Wrapped sections put the chip inside the flowing row, so it trails the
+  // last pill; a single line keeps it outside, pinned after the row.
+  const chipHome = wrap ? list : body;
 
-    /** Show the first `visible` pills in the row, the rest in the panel. */
-    const apply = (visible: number) => {
-      const overflow: HTMLElement[] = [];
-      pills.forEach((pill, i) => {
-        const target = i < visible ? list : panel.menu;
-        if (i >= visible) overflow.push(pill);
-        if (pill.parentElement !== target) target.appendChild(pill);
-      });
-      panel.setPills(overflow);
-      // Re-append last: moving pills in and out of the row must never leave
-      // the chip ahead of them.
-      chipHome.appendChild(panel.root);
-    };
+  /** Show the first `visible` pills in the row, the rest in the panel. */
+  const apply = (visible: number) => {
+    const overflow: HTMLElement[] = [];
+    pills.forEach((pill, i) => {
+      const target = i < visible ? list : panel.menu;
+      if (i >= visible) overflow.push(pill);
+      if (pill.parentElement !== target) target.appendChild(pill);
+    });
+    panel.setPills(overflow);
+    // Re-append last: moving pills in and out of the row must never leave
+    // the chip ahead of them.
+    chipHome.appendChild(panel.root);
+  };
 
-    const initial = Math.min(cap, pills.length);
-    apply(initial);
+  const initial = Math.min(cap, pills.length);
+  apply(initial);
 
-    if (!wrap && pills.length > initial) {
-      // A single clipped line: measure how many pills really fit and hand the
-      // rest to the panel, so nothing is ever half-hidden behind the edge.
-      const fit = () => {
-        if (!list.isConnected) return;
-        let visible = initial;
-        for (let pass = 0; pass < 4; pass++) {
-          apply(visible);
-          const edge = list.getBoundingClientRect().right;
-          if (edge === 0) return; // not laid out yet — a later pass will do it
-          let over = visible;
-          for (let i = 0; i < visible; i++) {
-            if (list.children[i].getBoundingClientRect().right > edge + 0.5) {
-              over = i;
-              break;
-            }
+  if (!wrap && pills.length > initial) {
+    // A single clipped line: measure how many pills really fit and hand the
+    // rest to the panel, so nothing is ever half-hidden behind the edge.
+    const fit = () => {
+      if (!list.isConnected) return;
+      let visible = initial;
+      for (let pass = 0; pass < 4; pass++) {
+        apply(visible);
+        const edge = list.getBoundingClientRect().right;
+        if (edge === 0) return; // not laid out yet — a later pass will do it
+        let over = visible;
+        for (let i = 0; i < visible; i++) {
+          if (list.children[i].getBoundingClientRect().right > edge + 0.5) {
+            over = i;
+            break;
           }
-          if (over === visible) return; // the whole row fits
-          // `over` can be 0: in a pane too narrow for even one pill, showing
-          // a clipped pill would be worse than showing none — the panel then
-          // holds the whole section.
-          visible = over;
         }
-      };
-      onRefit(fit);
-      // The row has to be laid out before it can be measured. The caller
-      // inserts the block synchronously after this returns, so a microtask
-      // measures it before the browser paints; the frame callback is the
-      // fallback for callers that insert later.
-      queueMicrotask(fit);
-      window.requestAnimationFrame(fit);
-    }
+        if (over === visible) return; // the whole row fits
+        // `over` can be 0: in a pane too narrow for even one pill, showing
+        // a clipped pill would be worse than showing none — the panel then
+        // holds the whole section.
+        visible = over;
+      }
+    };
+    onRefit(fit);
+    // The row has to be laid out before it can be measured. The caller
+    // inserts the block synchronously after this returns, so a microtask
+    // measures it before the browser paints; the frame callback is the
+    // fallback for callers that insert later.
+    queueMicrotask(fit);
+    window.requestAnimationFrame(fit);
   }
   root.appendChild(body);
   return root;
@@ -531,9 +536,11 @@ export function renderHierarchyBlock(
   file: TFile,
 ): HTMLElement {
   const settings = plugin.settings;
+  const t = getStrings(settings.language);
 
-  // Collect data into segments up front. Empty segments still render
-  // their header so the layout doesn't reflow when toggled off.
+  // Collect data into segments up front. A section with nothing to show is
+  // dropped outright rather than rendered as an empty placeholder: the block
+  // is navigation, and a row that says "nothing here" navigates nowhere.
   // Folder Notes occupy the same hierarchy position as their containing
   // folder. The markdown file is only the navigation target for that node.
   const logicalFolder = logicalFolderForFile(plugin, file);
@@ -548,18 +555,16 @@ export function renderHierarchyBlock(
     if (!settings.showParent) return null;
     if (parent instanceof TFolder && parent.path !== ROOT) {
       return {
-        label: "Parent",
+        label: t.parent,
         icon: Icons.chevronUp(),
-        emptyText: "",
         items: [makeItem(plugin, parent)],
       };
     }
     const home = resolveHomepageFile(plugin);
     if (!home || home.path === file.path) return null;
     return {
-      label: "Parent",
+      label: t.parent,
       icon: Icons.chevronUp(),
-      emptyText: "",
       items: [{ target: home, name: home.basename, kind: "home" as const }],
     };
   })();
@@ -582,35 +587,24 @@ export function renderHierarchyBlock(
       return c instanceof TFolder ? settings.showFolders : settings.showFiles;
     });
     filtered.sort(compareEntries);
-    siblingsSeg = {
-      label: "Siblings",
-      icon: Icons.hash(),
-      emptyText: "（无）",
-      items: filtered.map((s) => makeItem(plugin, s)),
-    };
-  }
-
-  const childrenSeg: Segment = (() => {
-    if (!settings.showFolders && !settings.showFiles) {
-      return {
-        label: "Children",
-        icon: Icons.chevronDown(),
-        emptyText: "已隐藏",
-        items: [],
+    // Nothing beside this note: the row goes away instead of standing there
+    // empty. That is the common case for a lone note in a folder.
+    if (filtered.length > 0) {
+      siblingsSeg = {
+        label: t.siblings,
+        icon: Icons.hash(),
+        items: filtered.map((s) => makeItem(plugin, s)),
       };
     }
+  }
+
+  const childrenSeg: Segment | null = (() => {
+    if (!settings.showFolders && !settings.showFiles) return null;
     // A plain note is a leaf: it has no children of its own, and its
     // siblings are not its children — the Siblings row already covers those.
     // Only a Folder Note stands for a folder, and only then is there contents
     // to navigate into.
-    if (!(logicalFolder instanceof TFolder)) {
-      return {
-        label: "Children",
-        icon: Icons.chevronDown(),
-        emptyText: "（无）",
-        items: [],
-      };
-    }
+    if (!(logicalFolder instanceof TFolder)) return null;
     const collected: Entry[] = [];
     collectLogicalChildren(plugin, logicalFolder, collected);
     const filtered = collected.filter((entry) => {
@@ -618,17 +612,20 @@ export function renderHierarchyBlock(
       return entry instanceof TFolder ? settings.showFolders : settings.showFiles;
     });
     filtered.sort(compareEntries);
+    // An empty folder, or a folder whose contents are all filtered out, has
+    // no Children row — same rule as everywhere else.
+    if (filtered.length === 0) return null;
     return {
-      label: "Children",
+      label: t.children,
       icon: Icons.chevronDown(),
-      emptyText: "空文件夹",
       items: filtered.map((c) => makeItem(plugin, c)),
     };
   })();
 
   // Layout: a 2-row pill — `rail` row on top, `segments` row below
-  // (so it stays one visual block). If we have nothing except parent
-  // (root case), collapse into a single rail row.
+  // (so it stays one visual block). The rail is always there: it carries the
+  // header label and the fold toggle, so the block keeps its identity even
+  // when every section below it has nothing to show.
   const block = el("div", { cls: BLOCK_CLASS });
   // Section layout rides on the block root so styles.css can switch the
   // pill rows between one clipped line and free wrapping.
@@ -709,7 +706,7 @@ export function renderHierarchyBlock(
   const onRefit = (fn: () => void) => refits.push(fn);
   if (parentSeg) segments.appendChild(buildSegment(plugin, parentSeg, onRefit));
   if (siblingsSeg) segments.appendChild(buildSegment(plugin, siblingsSeg, onRefit));
-  segments.appendChild(buildSegment(plugin, childrenSeg, onRefit));
+  if (childrenSeg) segments.appendChild(buildSegment(plugin, childrenSeg, onRefit));
   // The wrapper exists purely so the fold can animate: `grid-template-rows`
   // goes 1fr ↔ 0fr, which cannot be done on `.hn-segments` itself (it has an
   // inline `display: grid !important` and must stay that way).
@@ -748,27 +745,25 @@ export const INDEX_CLASS = "hn-index";
 /** Everything this plugin owns inside a view: header block + body overlay. */
 export const OWNED_SELECTOR = `.${BLOCK_CLASS}, .${INDEX_CLASS}`;
 
-/** How many entries a folder holds, e.g. "312 项". */
-const ITEM_SUFFIX = " 项";
-
 /** Frontmatter block at the very start of a note, for the raw-text fallback. */
 const FRONTMATTER_RE = /^\uFEFF?---\r?\n[\s\S]*?\r?\n---\r?\n?/;
 
 /**
- * Coarse relative time — "刚刚" / "3 小时前" / "2 天前", falling back to a
- * plain date once that stops being useful. Deliberately not locale-aware:
- * `Intl.RelativeTimeFormat` varies too much between machines.
+ * Coarse relative time — "just now" / "3 hours ago", falling back to a
+ * plain date once that stops being useful. Deliberately not built on
+ * `Intl.RelativeTimeFormat`: its wording varies far too much between
+ * machines, so the phrasing comes from the language table instead.
  */
-function relativeTime(ms: number): string {
+function relativeTime(ms: number, t: Strings): string {
   const diff = Date.now() - ms;
   const minute = 60_000;
   const hour = 60 * minute;
   const day = 24 * hour;
   if (!Number.isFinite(ms) || ms <= 0) return "";
-  if (diff < minute) return "刚刚";
-  if (diff < hour) return `${Math.round(diff / minute)} 分钟前`;
-  if (diff < day) return `${Math.round(diff / hour)} 小时前`;
-  if (diff < 7 * day) return `${Math.round(diff / day)} 天前`;
+  if (diff < minute) return t.justNow;
+  if (diff < hour) return t.minutesAgo(Math.round(diff / minute));
+  if (diff < day) return t.hoursAgo(Math.round(diff / hour));
+  if (diff < 7 * day) return t.daysAgo(Math.round(diff / day));
   const d = new Date(ms);
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
@@ -836,6 +831,7 @@ export function renderBodyIndex(
   if (items.length === 0) return null;
 
   const root = el("div", { cls: INDEX_CLASS, attr: { "data-hn-file": file.path } });
+  const t = getStrings(plugin.settings.language);
 
   /* ── Head: label, counts, and the way into the note ── */
   const folders = items.filter((i) => i instanceof TFolder).length;
@@ -843,11 +839,11 @@ export function renderBodyIndex(
   const inner = el("div", { cls: "hn-index-inner" });
   const head = el("div", { cls: "hn-index-head" });
   head.appendChild(Icons.grid());
-  head.appendChild(el("span", { cls: "hn-index-title", text: "子节点" }));
+  head.appendChild(el("span", { cls: "hn-index-title", text: t.bodyIndexTitle }));
   head.appendChild(
     el("span", {
       cls: "hn-index-count",
-      text: `${folders} 文件夹 · ${files} 文件`,
+      text: t.bodyIndexCounts(folders, files),
     }),
   );
   inner.appendChild(head);
@@ -886,8 +882,8 @@ export function renderBodyIndex(
       el("span", {
         cls: "hn-index-meta",
         text: folderEntry
-          ? `${folderEntry.children?.length ?? 0}${ITEM_SUFFIX}`
-          : relativeTime((fileEntry as TFile).stat?.mtime ?? 0),
+          ? t.folderItemCount(folderEntry.children?.length ?? 0)
+          : relativeTime((fileEntry as TFile).stat?.mtime ?? 0, t),
       }),
     );
     row.addEventListener("click", (ev) => {

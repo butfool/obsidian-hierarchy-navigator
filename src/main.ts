@@ -4,6 +4,7 @@ import {
   MarkdownView,
   WorkspaceLeaf,
   View,
+  type Command,
 } from "obsidian";
 import {
   DEFAULT_SETTINGS,
@@ -11,6 +12,7 @@ import {
   AnyApp,
   HierarchyNavigatorPlugin,
 } from "./types";
+import { getStrings } from "./i18n";
 import { HierarchyNavigatorSettingTab } from "./settingTab";
 import {
   renderHierarchyBlock,
@@ -32,6 +34,9 @@ export default class HierarchyNavigator
 {
   public settings: HierarchyNavigatorSettings;
   private pendingTitleRetries = new WeakSet<WorkspaceLeaf>();
+  /** Command-registry entries, kept so their names can follow the language. */
+  private revealParentCommand: Command | null = null;
+  private openFirstChildCommand: Command | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -105,9 +110,12 @@ export default class HierarchyNavigator
     this.syncAllOpenLeaves();
 
     // ── Commands ──
-    this.addCommand({
+    // The returned objects are the live entries in the command registry, so
+    // `localizeCommands` can retitle them in place when the language changes
+    // — no reload, no re-registration.
+    this.revealParentCommand = this.addCommand({
       id: "reveal-parent",
-      name: "Reveal parent folder in file explorer",
+      name: getStrings(this.settings.language).revealParentCommand,
       checkCallback: (checking) => {
         const file = this.activeFile();
         if (!file || !isEligible(this, file)) return false;
@@ -121,9 +129,9 @@ export default class HierarchyNavigator
       },
     });
 
-    this.addCommand({
+    this.openFirstChildCommand = this.addCommand({
       id: "open-first-child",
-      name: "Open the first child file",
+      name: getStrings(this.settings.language).openFirstChildCommand,
       checkCallback: (checking) => {
         const file = this.activeFile();
         if (!file || !isEligible(this, file)) return false;
@@ -169,7 +177,23 @@ export default class HierarchyNavigator
 
   /** Re-render the block everywhere so a settings change is visible at once. */
   refresh(): void {
+    this.localizeCommands();
     this.syncAllOpenLeaves();
+  }
+
+  /**
+   * Retitle the registered commands in the current language. Command names
+   * live in Obsidian's own registry (the command palette, the hotkey list),
+   * not in our DOM, so a language change has to reach them explicitly.
+   */
+  private localizeCommands(): void {
+    const t = getStrings(this.settings.language);
+    if (this.revealParentCommand) {
+      this.revealParentCommand.name = t.revealParentCommand;
+    }
+    if (this.openFirstChildCommand) {
+      this.openFirstChildCommand.name = t.openFirstChildCommand;
+    }
   }
 
   get looseApp(): AnyApp {

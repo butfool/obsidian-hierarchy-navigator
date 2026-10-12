@@ -1,6 +1,15 @@
 import { Plugin, App } from "obsidian";
 
+/** Interface languages this plugin ships. */
+export type Locale = "zh" | "en";
+
 export interface HierarchyNavigatorSettings {
+  /**
+   * Language of the plugin's own interface — the block labels, the body
+   * index and the settings tab. Never the notes themselves.
+   */
+  language: Locale;
+
   /** Header text shown above the block. */
   headerTitle: string;
 
@@ -42,6 +51,7 @@ export interface HierarchyNavigatorSettings {
 }
 
 export const DEFAULT_SETTINGS: HierarchyNavigatorSettings = {
+  language: "zh",
   headerTitle: "Hierarchy",
   showParent: true,
   showFolders: true,

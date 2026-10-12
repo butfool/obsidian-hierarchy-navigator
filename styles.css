@@ -177,10 +177,6 @@
   min-width: 0;
 }
 
-.hn-segment-body > .hn-empty {
-  white-space: nowrap;
-}
-
 /* Pills row — always a single line; items above the configured limit
    collapse into the "+N" dropdown rendered right after it. */
 .hn-pills {
@@ -406,14 +402,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* Empty state within a segment */
-.hn-empty {
-  display: inline-block;
-  color: var(--hn-text-muted);
-  font-style: italic;
-  padding: 2px 0;
 }
 
 /* Inline separator between segments */
