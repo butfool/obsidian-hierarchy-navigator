@@ -1,0 +1,10 @@
+{
+  "headerTitle": "Hierarchy",
+  "showParent": true,
+  "showFolders": true,
+  "showFiles": true,
+  "showSiblings": true,
+  "sectionLayout": "wrap",
+  "maxVisibleItems": 6,
+  "collapsed": false
+}

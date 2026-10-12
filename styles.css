@@ -1,0 +1,419 @@
+/* ──────────────────────────────────────────────
+   Hierarchy Navigator — styles.css
+   Aesthetic: minimal one-line chip rail. Single
+   block per view; no list/ul styles; respects
+   Obsidian theme variables.
+   ────────────────────────────────────────────── */
+
+/* ── Root wrapper ─────────────────────────────────
+   All rules use the `hn-` prefix exclusively so
+   no global `ul`, `li`, `a.internal-link` will be
+   overridden by theme CSS. */
+.obsidian-hierarchy-navigator,
+.hn-root {
+  --hn-radius: 6px;
+  --hn-gap: 6px;
+  --hn-rail-h: 28px;
+  --hn-bg: transparent;
+  --hn-border: var(--background-modifier-border, rgba(127, 127, 127, 0.18));
+  --hn-text: var(--text-normal);
+  --hn-text-muted: var(--text-muted);
+  font-family: var(--font-interface);
+  font-size: var(--nav-item-size, 0.82em);
+  line-height: 1.4;
+  color: var(--hn-text);
+
+  display: block;
+  /* The vault uses a card/grid layout on this note. Make the
+     navigation occupy a full row instead of landing in the grid's
+     second column beside the title. These are layout-only rules and
+     remain scoped to our root class. */
+  grid-column: 1 / -1 !important;
+  grid-row: auto !important;
+  justify-self: stretch !important;
+  align-self: stretch !important;
+  flex: 0 0 100% !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  float: none !important;
+  clear: both !important;
+  margin: 4px 0 14px 0 !important;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+/* ── Top rail: header row + collapse toggle ── */
+.hn-rail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--hn-rail-h);
+  padding: 0 10px;
+  margin: 0 0 10px 0;
+  border-bottom: 1px dashed var(--hn-border);
+  color: var(--hn-text-muted);
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  transition: margin-bottom 180ms ease, border-color 180ms ease, color 120ms ease;
+}
+
+.hn-rail:hover { color: var(--hn-text); }
+
+.hn-rail-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Disclosure chevron — points down when open, sideways when folded. */
+.hn-rail-toggle { display: inline-flex; align-items: center; }
+.hn-rail-toggle svg { transition: transform 120ms ease; }
+.hn-root.hn-collapsed .hn-rail-toggle svg { transform: rotate(-90deg); }
+
+.hn-rail svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  opacity: 0.7;
+}
+
+.hn-rail-label { white-space: nowrap; }
+
+/* ── Fold wrapper ──
+   The collapsible body lives here so the fold can animate: the wrapper's
+   `grid-template-rows` tweens 1fr ↔ 0fr. The segments themselves keep
+   their own grid (they carry an inline `display: grid !important`). */
+.hn-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  min-height: 0;
+  transition: grid-template-rows 180ms ease, visibility 0s;
+}
+
+.hn-fold > .hn-segments { min-height: 0; }
+
+.hn-root.hn-collapsed .hn-fold {
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  overflow: hidden;
+  /* Hide the content only once the row has finished collapsing. */
+  transition: grid-template-rows 180ms ease, visibility 0s linear 180ms;
+}
+
+/* While unfolding, clip the growing row. JS removes this class when the
+   animation ends so the "+N" dropdown can overflow the block again. */
+.hn-root.hn-folding .hn-fold { overflow: hidden; }
+
+/* Folded: drop the divider under the header (animated via the rail's own
+   transition) so only the title row remains. */
+.hn-root.hn-collapsed .hn-rail {
+  margin-bottom: 0;
+  border-bottom-color: transparent;
+}
+
+/* ── Segments row: Pill chips for each item ── */
+.hn-segments {
+  /* Two-column grid: the label column is sized to the widest label and
+     every row's content column starts at the exact same x. Segments use
+     `display: contents`, so their head and body become the two cells of
+     one row. */
+  display: grid !important;
+  grid-template-columns: max-content 1fr !important;
+  align-items: center !important;
+  column-gap: 10px !important;
+  row-gap: 6px !important;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.hn-segment {
+  /* The segment box itself disappears; its head and body join the parent
+     grid as aligned columns. */
+  display: contents !important;
+}
+
+/* "Parent", "Siblings", "Children" labels — keep the icon
+   constrained. Without this rule inline SVGs can inherit a theme's
+   generic svg width/height and become enormous. */
+.hn-segment-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  color: var(--hn-text-muted);
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hn-segment-head svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  opacity: 0.65;
+}
+
+.hn-segment-label {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.hn-segment-body {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hn-segment-body > .hn-empty {
+  white-space: nowrap;
+}
+
+/* Pills row — always a single line; items above the configured limit
+   collapse into the "+N" dropdown rendered right after it. */
+.hn-pills {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+}
+
+/* ── Wrapped sections ──
+   `.hn-wrap` lets a section use as many rows as its items need, up to
+   `maxVisibleItems`; the rest still live in the "+N" panel. */
+.hn-wrap .hn-segment-body {
+  align-items: flex-start;
+}
+
+.hn-wrap .hn-pills {
+  flex-wrap: wrap;
+  overflow: visible;
+  row-gap: 4px;
+}
+
+.hn-pill {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid var(--hn-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hn-text);
+  text-decoration: none;
+  cursor: pointer;
+  font-size: 0.95em;
+  line-height: 1;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.hn-pill:hover {
+  background: var(--background-modifier-hover, rgba(127, 127, 127, 0.08));
+  border-color: var(--background-modifier-border-hover, var(--hn-border));
+}
+
+.hn-pill:active { transform: translateY(1px); }
+
+.hn-pill svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  opacity: 0.7;
+  color: var(--hn-text-muted);
+}
+
+/* Folder Note = folder that opens as a note: same shape as a folder,
+   tinted so it stands apart from plain folders. */
+.hn-pill.hn-kind-folder-note svg {
+  color: var(--text-accent);
+  opacity: 0.9;
+}
+
+/* Homepage note (Homepage plugin) shown at the root level. */
+.hn-pill.hn-kind-home svg {
+  color: var(--text-accent);
+  opacity: 0.9;
+}
+
+/* ── File-type tints ──
+   The glyph says *what kind* of file it is; the tint makes that
+   readable at 12px, where a page outline plus a fold is otherwise the
+   same smudge for every document type. Each family maps to a modifier
+   class (`hn-type-<family>`) so a theme can retint or flatten them.
+   Theme colors come first, with a fixed fallback for themes that do
+   not define them. */
+.hn-pill.hn-type-pdf svg {
+  color: var(--color-red, #e5604b);
+  opacity: 0.95;
+}
+
+.hn-pill.hn-type-image svg {
+  color: var(--color-green, #3aa675);
+  opacity: 0.95;
+}
+
+.hn-pill.hn-type-canvas svg {
+  color: var(--color-orange, #e08a3c);
+  opacity: 0.95;
+}
+
+.hn-pill.hn-type-base svg {
+  color: var(--color-cyan, #2fa4b3);
+  opacity: 0.95;
+}
+
+.hn-pill.hn-type-video svg {
+  color: var(--color-purple, #8b6ce0);
+  opacity: 0.95;
+}
+
+.hn-pill.hn-type-audio svg {
+  color: var(--color-pink, #dd6ba0);
+  opacity: 0.95;
+}
+
+.hn-pill.hn-type-code svg {
+  color: var(--color-blue, #4a7ddb);
+  opacity: 0.95;
+}
+
+/* Notes are the default reading context: keep them neutral so the
+   tinted families actually stand out. */
+.hn-pill.hn-type-note svg {
+  color: var(--hn-text-muted);
+  opacity: 0.7;
+}
+
+/* "+N" overflow chip and its dropdown menu. */
+.hn-more {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.hn-more-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border: 1px dashed var(--hn-border);
+  border-radius: 999px;
+  color: var(--hn-text-muted);
+  cursor: pointer;
+  font-size: 0.95em;
+  line-height: 1;
+  user-select: none;
+  white-space: nowrap;
+  list-style: none;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.hn-more-chip::-webkit-details-marker { display: none; }
+
+/* `hn-open` (not `[open]`) drives the styling: JS keeps `open` set while the
+   panel animates out, and the chip should not stay lit that long. */
+.hn-more.hn-open > .hn-more-chip {
+  color: var(--hn-text);
+  border-style: solid;
+  background: var(--background-modifier-hover, rgba(127, 127, 127, 0.08));
+}
+
+.hn-more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 10em;
+  max-height: 45vh;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--background-modifier-border, rgba(127, 127, 127, 0.2));
+  border-radius: 8px;
+  background: var(--background-secondary, var(--background-primary));
+  box-shadow: var(--shadow-s, 0 4px 12px rgba(0, 0, 0, 0.15));
+  /* Unfolds from the chip in the top-right corner it hangs off. */
+  transform-origin: top right;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.97);
+  transition: opacity 140ms ease, transform 140ms ease;
+  pointer-events: none;
+}
+
+.hn-more.hn-open > .hn-more-menu {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* Hover bridge. The panel sits 6px below the chip, so without this the
+   pointer crosses dead space on its way to an item, `mouseleave` fires and
+   the panel is gone before it can be clicked. The bridge is invisible, spans
+   exactly that band (its width is measured from the panel by JS). */
+.hn-more.hn-open::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: var(--hn-bridge-w, 10em);
+  height: 6px;
+}
+
+/* Items cascade in behind the panel rather than appearing all at once.
+   `backwards` (not `both`) so the animation leaves no fill behind and the
+   pills keep their normal hover/press transitions. */
+.hn-more.hn-open > .hn-more-menu > .hn-pill {
+  animation: hn-menu-item 160ms ease backwards;
+  animation-delay: calc(min(var(--hn-i, 0), 6) * 18ms);
+}
+
+@keyframes hn-menu-item {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
+
+.hn-pill-name {
+  max-width: 12em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Empty state within a segment */
+.hn-empty {
+  display: inline-block;
+  color: var(--hn-text-muted);
+  font-style: italic;
+  padding: 2px 0;
+}
+
+/* Inline separator between segments */
+.hn-segment + .hn-segment::before {
+  display: none;
+}
+
+/* ── On very narrow screens, drop the segment labels ── */
+@media (max-width: 520px) {
+  .hn-segment-label { display: none; }
+  .hn-segment + .hn-segment::before { display: none; }
+}
