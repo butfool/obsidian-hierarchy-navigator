@@ -416,17 +416,22 @@
 }
 
 /* ══════════════════════════════════════════════════
-   Body index — an overlay over the note body.
+   Body index — a block in the note, where its body
+   would start.
 
-   It is *not* part of the document flow: `main.ts` gives it a `top`
-   (the bottom edge of everything the note shows above its body — the
-   header block and the Properties block) and hangs it in the pane's
-   content element. An empty note has nothing to push around, and when
-   the first keystroke retires the overlay, the text does not move.
+   It is part of the document flow: `main.ts` inserts it directly after
+   the header rail, inside the same reading column, so it scrolls with
+   the text and inherits the column's width. Nothing about its position
+   is measured in JS.
 
-   Properties are the note's own content, so the overlay starts below
-   them: it is opaque, and anchoring it to the header block alone would
-   swallow them whole.
+   It is worth being precise about why this is safe: the index only
+   exists while the note's body is empty and only in reading mode, so
+   there is no text below it to push around — appearing and leaving
+   still moves nothing the reader can see.
+
+   Properties are the note's own content and sit above it in the
+   document, so the index starts where that content stops, without
+   anybody having to measure anything.
 
    Visually it is a launcher page, not a panel: the note's own
    background, the text font at text size, one calm list, no cards.
@@ -437,35 +442,22 @@
   --hn-border: var(--background-modifier-border, rgba(127, 127, 127, 0.18));
   --hn-text-muted: var(--text-muted);
 
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  top: 0; /* overwritten inline once the header block has been measured */
-  z-index: 5;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-
-  display: flex;
-  justify-content: center;
+  display: block;
+  width: 100%;
+  /* A theme that draws the reading column as a grid must not drop the
+     index into a cell beside the text: same guard as the header rail. */
+  grid-column: 1 / -1;
 
   background: var(--background-primary);
   font-family: var(--font-text, var(--font-interface));
   font-size: var(--font-text-size, 1em);
   line-height: 1.5;
   color: var(--text-normal);
-  transition: opacity 160ms ease;
-}
-
-.hn-index.is-hiding {
-  opacity: 0;
-  pointer-events: none;
 }
 
 .hn-index-inner {
   width: 100%;
-  max-width: 620px;
-  padding: 7vh 26px 48px;
+  padding: 22px 0 48px;
 }
 
 /* ── Head: label, counts, dismiss ── */
@@ -537,8 +529,4 @@
   color: var(--hn-text-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hn-index { transition: none; }
 }

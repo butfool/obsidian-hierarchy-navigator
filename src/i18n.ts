@@ -21,7 +21,7 @@ export interface Strings {
   overflowChip: (count: number) => string;
 
   /* ── Body index ── */
-  /** Heading of the overlay index. */
+  /** Heading of the body index. */
   bodyIndexTitle: string;
   /** "3 folders · 12 files" under the heading. */
   bodyIndexCounts: (folders: number, files: number) => string;
@@ -142,11 +142,12 @@ const en: Strings = {
     showBodyIndexName: "Show a children index in the note body",
     showBodyIndexDesc:
       "While the note body is empty — whitespace, or frontmatter and " +
-      "nothing else — lay a children index over it: folders first with " +
-      "their item counts, files with their last modified time. It is an " +
-      "overlay, not part of the document: nothing reflows when it appears, " +
-      "reading mode only: switch the note to editing and it is simply not " +
-      "there, so it can never cover what you are writing. Nothing is " +
+      "nothing else — render a children index where the body would begin: " +
+      "folders first with their item counts, files with their last modified " +
+      "time. It is a block in the note, so it scrolls with the text and " +
+      "stays in the reading column; reading mode only: switch the note to " +
+      "editing and it is simply not there, so it can never come between you " +
+      "and what you are writing. Nothing is " +
       "written to disk and the header block is never touched.",
     tipsHeading: "Tips",
     tips:
@@ -211,11 +212,11 @@ const zh: Strings = {
     bodyIndexHeading: "正文索引",
     showBodyIndexName: "在正文中显示子级索引",
     showBodyIndexDesc:
-      "当笔记正文为空时 —— 只有空白，或只有属性 —— 在正文上覆盖一层" +
-      "子级索引：文件夹在前并显示条目数，文件显示最后修改时间。它是" +
-      "覆盖层而不是文档的一部分：出现时不会引起任何重排；只在阅读模式" +
-      "显示，切到编辑模式它就不在，因此永远不会遮住你正在写的内容。" +
-      "不写入磁盘，也不影响顶部区块。",
+      "当笔记正文为空时 —— 只有空白，或只有属性 —— 在正文本该开始的" +
+      "位置渲染一份子级索引：文件夹在前并显示条目数，文件显示最后修改" +
+      "时间。它是笔记里的一个块，因此随正文一起滚动，也留在正文栏内；" +
+      "只在阅读模式显示，切到编辑模式它就不在，因此永远不会挡住你正在" +
+      "写的内容。不写入磁盘，也不影响顶部区块。",
     tipsHeading: "提示",
     tips: "在笔记的 frontmatter 中加入 `hierarchy-nav: hide`，即可让该笔记完全跳过本插件。",
   },

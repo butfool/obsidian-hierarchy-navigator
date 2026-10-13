@@ -735,47 +735,22 @@ export function isEligible(plugin: HierarchyNavigator, file: TFile | null): file
 
 
 /* ────────────────────────────────────────────────
-   Body index — the Children of this note, laid over
-   the note body instead of into it.
+   Body index — the Children of this note, rendered
+   into the note under the header rail.
    ──────────────────────────────────────────────── */
 
-/** Class of the body index overlay — `main.ts` mounts, positions, removes it. */
+/** Class of the body index block — `main.ts` mounts and removes it. */
 export const INDEX_CLASS = "hn-index";
 
-/** Everything this plugin owns inside a view: header block + body overlay. */
+/** Everything this plugin owns inside a view: header block + body index. */
 export const OWNED_SELECTOR = `.${BLOCK_CLASS}, .${INDEX_CLASS}`;
 
 /**
- * What the body overlay has to stay below: our own navigation block, and the
- * note's Properties block. Properties are the note's own content — the
- * overlay is an opaque panel, so anchoring it to the navigation block alone
- * would swallow them whole.
- *
- * The selector is exported so `main.ts` can observe exactly the elements it
- * measured, instead of guessing at them a second time.
+ * The note's own Properties block, in whichever container the theme draws it.
+ * An embedded note or a Base card renders one too, so callers filter those out
+ * (`.markdown-embed, .internal-embed`) before treating it as this note's.
  */
-export const CHROME_SELECTOR = `.${BLOCK_CLASS}, .metadata-container, .metadata-properties`;
-
-/**
- * Bottom edge, in viewport coordinates, of the chrome the note renders above
- * its body. Null when nothing measurable is there yet, so callers can fall
- * back to a fixed offset rather than guess.
- */
-export function chromeBottom(host: HTMLElement): number | null {
-  let bottom: number | null = null;
-  host.querySelectorAll<HTMLElement>(CHROME_SELECTOR).forEach((node) => {
-    // An embedded note or Base card renders its own Properties element. It
-    // belongs to that embed, not to the pane we are measuring.
-    if (node.closest(".markdown-embed, .internal-embed")) return;
-    // Hidden elements report an all-zero rect, which `max` ignores by itself.
-    const edge = node.getBoundingClientRect().bottom;
-    if (!Number.isFinite(edge)) return;
-    bottom = bottom === null ? edge : Math.max(bottom, edge);
-  });
-  if (bottom !== null) return bottom;
-  const title = host.querySelector<HTMLElement>(".inline-title, :scope h1");
-  return title ? title.getBoundingClientRect().bottom : null;
-}
+export const PROPERTIES_SELECTOR = ".metadata-container, .metadata-properties";
 
 /** Frontmatter block at the very start of a note, for the raw-text fallback. */
 const FRONTMATTER_RE = /^\uFEFF?---\r?\n[\s\S]*?\r?\n---\r?\n?/;
@@ -804,11 +779,11 @@ function relativeTime(ms: number, t: Strings): string {
 /**
  * Is this note's body empty — only whitespace, or only frontmatter?
  *
- * That is the "nothing written yet" case the overlay exists for. Frontmatter
+ * That is the "nothing written yet" case the index exists for. Frontmatter
  * is not body text: a folder note that is nothing but properties is still an
  * empty page. `null` means the metadata cache has not been built yet, so the
  * caller should read the file text rather than guess — a wrong `true` here
- * drops a panel over writing that exists.
+ * puts launcher rows above writing that exists.
  */
 export function isNoteBodyEmpty(
   plugin: HierarchyNavigator,
@@ -826,14 +801,14 @@ export function isRawBodyEmpty(text: string): boolean {
 }
 
 /**
- * The body index: a Children-only launcher, laid *over* the note body.
+ * The body index: a Children-only launcher, rendered into the note where its
+ * body would begin.
  *
- * It is deliberately not part of the document flow. An empty note has nothing
- * to push around, and taking the overlay away never moves the text by a pixel
- * — which a block inserted into the document could not promise. `main.ts`
- * gives it a `top` (the bottom edge of the header block), mounts it in the
- * pane's content element, and only ever does so in reading mode: an overlay
- * has no business covering the editor you are writing in.
+ * It is a block in the document, not a panel over the pane: `main.ts` inserts
+ * it directly under the header rail, so it scrolls with the text and inherits
+ * the reading column's width without anyone measuring anything. That is safe
+ * because the index only exists while the body is empty and only in reading
+ * mode — there is no text below it to displace.
  *
  * Returns null when there is nothing worth showing, so callers can skip it.
  */

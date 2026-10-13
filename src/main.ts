@@ -21,11 +21,10 @@ import {
   isRawBodyEmpty,
   refitSections,
   isEligible,
-  chromeBottom,
   BLOCK_CLASS,
-  CHROME_SELECTOR,
   INDEX_CLASS,
   OWNED_SELECTOR,
+  PROPERTIES_SELECTOR,
 } from "./renderer";
 
 const PLUGIN_NAME = "Hierarchy Navigator";
@@ -94,18 +93,14 @@ export default class HierarchyNavigator
       }),
     );
 
-    // Belt and braces for the reading/editing split: if an overlay ever
+    // Belt and braces for the reading/editing split: if the index ever
     // survives a mode switch (no `layout-change`), clicking into the editor
-    // still clears it. The overlay must never sit over the caret.
+    // still clears it. Keeping it would put launcher rows above the caret.
     this.registerDomEvent(document, "focusin", (ev) => {
       const target = ev.target as HTMLElement | null;
       if (!target?.closest?.(".cm-editor")) return;
       const pane = target.closest<HTMLElement>(".workspace-leaf-content");
-      const overlay = pane?.querySelector<HTMLElement>(`.${INDEX_CLASS}`);
-      if (!overlay) return;
-      this.indexObservers.get(overlay)?.disconnect();
-      this.indexObservers.delete(overlay);
-      overlay.remove();
+      pane?.querySelector<HTMLElement>(`.${INDEX_CLASS}`)?.remove();
     });
 
     // Initial mount for the leaf already open at plugin load time.
@@ -321,26 +316,24 @@ export default class HierarchyNavigator
 
     if (!placeChrome()) return;
 
-    // The body index is an overlay over the note body rather than a node in
-    // it: nothing reflows when it appears, and nothing moves when it leaves.
+    // The index is a node in the note, placed directly under the header rail
+    // by `attachBodyIndex`: it scrolls with the text like any other block.
     this.mountBodyIndex(view, file);
   }
 
   /* ────────────────────────────────────────────────
-     Body index overlay
+     Body index
      ──────────────────────────────────────────────── */
 
-  /** Overlays that follow their header block's height. */
-  private indexObservers = new WeakMap<HTMLElement, ResizeObserver>();
-
   /**
-   * Mount the body index, but only while the note body is empty. An overlay
-   * over a note that *has* a body would hide the thing the user came to read.
+   * Mount the body index, but only while the note body is empty: it is a
+   * launcher for a page that has nothing on it yet, and on a note that already
+   * has a body it would only be one more thing to scroll past.
    */
   private mountBodyIndex(view: MarkdownView, file: TFile): void {
-    // Reading mode only. An overlay is for a page you are *looking* at: put it
-    // over the editor and it covers what you are writing, so editing mode
-    // simply never gets one.
+    // Reading mode only. A launcher is for a page you are *looking* at: in the
+    // editor it would sit between you and the text you are writing, so editing
+    // mode simply never gets one.
     if (view.getMode() !== "preview") return;
 
     const empty = isNoteBodyEmpty(this, file);
@@ -359,53 +352,55 @@ export default class HierarchyNavigator
     });
   }
 
-  /** Build the overlay, hang it in the pane, and keep it under the chrome. */
+  /**
+   * Build the index and put it in the document, directly under whatever the
+   * note shows above its body: the Properties block when it has one, our
+   * header rail when it does not. Living in the note rather than over the pane
+   * is what makes it scroll with the text and inherit the reading column's
+   * width — and it is safe precisely because the index only exists on an empty
+   * body: there is nothing below it to displace.
+   */
   private attachBodyIndex(view: MarkdownView, file: TFile): void {
-    const overlay = renderBodyIndex(this, file);
-    if (!overlay) return;
+    const index = renderBodyIndex(this, file);
+    if (!index) return;
 
-    const host = view.contentEl;
-    // The overlay is positioned against the pane, not the document.
-    if (getComputedStyle(host).position === "static") {
-      host.style.position = "relative";
+    const rail = view.contentEl.querySelector<HTMLElement>(`.${BLOCK_CLASS}`);
+    const anchor = this.bodyAnchor(view.contentEl, rail);
+    if (anchor?.parentElement) {
+      anchor.insertAdjacentElement("afterend", index);
+      return;
     }
-    host.appendChild(overlay);
 
-    const fit = () => {
-      if (!overlay.isConnected) return;
-      // Anchor below everything the note already shows above its body — the
-      // navigation block *and* the Properties block. Properties are the note's
-      // own content; the overlay is opaque, so starting at the navigation
-      // block would hide them. Falls back to a fixed offset when nothing is
-      // measurable yet, so a missing header block can never make the overlay
-      // cover the title.
-      const anchor = chromeBottom(host);
-      const top =
-        anchor === null ? 120 : anchor - host.getBoundingClientRect().top;
-      overlay.style.setProperty("top", `${Math.max(0, Math.round(top)) + 14}px`);
-    };
-    fit();
-    window.requestAnimationFrame(fit);
-
-    // Folding a section, resizing the pane, letting the chips wrap, or
-    // expanding the Properties block all change how tall the chrome is — the
-    // overlay has to follow every one of them.
-    if (typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver(fit);
-      host
-        .querySelectorAll<HTMLElement>(CHROME_SELECTOR)
-        .forEach((node) => observer.observe(node));
-      this.indexObservers.set(overlay, observer);
-    }
+    // Nothing to sit under (a theme hid both the title and Properties, or the
+    // two mounts raced): fall back to the end of the reading column.
+    const sizer =
+      view.contentEl.querySelector<HTMLElement>(".markdown-preview-sizer") ??
+      view.contentEl;
+    sizer.appendChild(index);
   }
 
-  /** Remove everything this plugin owns in a container, observers included. */
+  /**
+   * The bottom-most thing the note shows above its body — Properties when the
+   * note has them, the header rail when it does not. The rail is mounted
+   * *above* Properties, so anchoring to the rail would push the note's own
+   * frontmatter below the list; anchoring to Properties keeps the document in
+   * its natural order.
+   */
+  private bodyAnchor(
+    host: HTMLElement,
+    rail: HTMLElement | null,
+  ): HTMLElement | null {
+    // The note's own Properties block is the one sharing the rail's container:
+    // Obsidian renders both in the same reading column.
+    const own = Array.from(
+      host.querySelectorAll<HTMLElement>(PROPERTIES_SELECTOR),
+    ).find((node) => node.parentElement === rail?.parentElement);
+    return own ?? rail;
+  }
+
+  /** Remove everything this plugin owns in a container. */
   private removeOwned(host: HTMLElement): void {
-    host.querySelectorAll<HTMLElement>(OWNED_SELECTOR).forEach((node) => {
-      this.indexObservers.get(node)?.disconnect();
-      this.indexObservers.delete(node);
-      node.remove();
-    });
+    host.querySelectorAll<HTMLElement>(OWNED_SELECTOR).forEach((node) => node.remove());
   }
 
   /** Walk every markdown leaf and (re-)mount if it's a preview leaf. */
