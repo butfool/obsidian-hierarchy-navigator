@@ -539,7 +539,7 @@
    dialog stays open and says so in place. */
 .hn-create-error {
   margin: 10px 0 0;
-  color: var(--text-error, #e93147);
+  color: var(--text-error);
   font-size: 0.9em;
 }
 

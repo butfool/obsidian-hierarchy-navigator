@@ -44,8 +44,10 @@ type FileManagerWithCreate = FileManager & {
 
 /** The name as it will hit the disk: trimmed, and without a typed `.md`. */
 export function normalizeName(kind: CreateKind, raw: string): string {
-  const trimmed = raw.trim();
-  return kind === "note" ? trimmed.replace(/\.md$/i, "").trim() : trimmed;
+  const name = raw.trim();
+  // "Foo.md" and "Foo .md" both mean the note "Foo" — the extension is a
+  // hint at what you are making, not part of its name.
+  return kind === "note" ? name.replace(/\s*\.md$/i, "") : name;
 }
 
 /** Empty, "." / "..", or holding something a path cannot. */

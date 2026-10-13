@@ -1,7 +1,7 @@
 import { Modal, Notice, Setting, type ButtonComponent, type TFolder } from "obsidian";
 import type HierarchyNavigator from "./main";
 import { getStrings } from "./i18n";
-import { createChild, normalizeName, type CreateKind } from "./create";
+import { createChild, type CreateKind } from "./create";
 
 /**
  * The dialog behind the body index's create button: pick a note or a folder,
@@ -102,21 +102,21 @@ export class CreateChildModal extends Modal {
     const setting = this.folderNoteSetting;
     if (!setting) return;
     const t = getStrings(this.plugin.settings.language);
-    const name = normalizeName("folder", this.name) || t.createNamePlaceholder;
+    const name = this.name.trim() || t.createNamePlaceholder;
     setting.setDesc(t.createFolderNoteDesc(name));
-    setting.settingEl.style.display = this.kind === "folder" ? "" : "none";
+    setting.settingEl.toggle(this.kind === "folder");
   }
 
   private showError(message: string): void {
     if (!this.errorEl) return;
     this.errorEl.setText(message);
-    this.errorEl.style.display = "";
+    this.errorEl.show();
   }
 
   private clearError(): void {
     if (!this.errorEl) return;
     this.errorEl.setText("");
-    this.errorEl.style.display = "none";
+    this.errorEl.hide();
   }
 
   private setBusy(busy: boolean): void {

@@ -802,6 +802,34 @@ export function isRawBodyEmpty(text: string): boolean {
 }
 
 /**
+ * The body index's create button — the plugin's one control that writes.
+ *
+ * It is a launcher affordance, not navigation, so it wears the same quiet pill
+ * as the rest of the index rather than a button skin; the label and its
+ * tooltip come from the same string, which keeps the icon-only phone layout
+ * (`.hn-index-new-label` is hidden there) described for screen readers too.
+ */
+function makeCreateButton(
+  plugin: HierarchyNavigator,
+  folder: TFolder,
+): HTMLElement {
+  const t = getStrings(plugin.settings.language);
+  const button = el("button", {
+    cls: "hn-index-new",
+    attr: { type: "button", "aria-label": t.createAction, title: t.createAction },
+    children: [
+      Icons.plus(),
+      el("span", { cls: "hn-index-new-label", text: t.createAction }),
+    ],
+  });
+  button.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    promptCreateChild(plugin, folder);
+  });
+  return button;
+}
+
+/**
  * The body index: a Children-only launcher, rendered into the note where its
  * body would begin.
  *
@@ -866,24 +894,7 @@ export function renderBodyIndex(
      folder is empty" page, so it is the honest place to offer it. ── */
   if (plugin.settings.enableCreate) {
     head.appendChild(el("span", { cls: "hn-index-spacer" }));
-    const createButton = el("button", {
-      cls: "hn-index-new",
-      attr: {
-        type: "button",
-        "data-hn-create": file.path,
-        "aria-label": t.createAction,
-        title: t.createAction,
-      },
-      children: [
-        Icons.plus(),
-        el("span", { cls: "hn-index-new-label", text: t.createAction }),
-      ],
-    });
-    createButton.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      promptCreateChild(plugin, folder);
-    });
-    head.appendChild(createButton);
+    head.appendChild(makeCreateButton(plugin, folder));
   }
 
   inner.appendChild(head);
