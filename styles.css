@@ -413,6 +413,9 @@
 @media (max-width: 520px) {
   .hn-segment-label { display: none; }
   .hn-segment + .hn-segment::before { display: none; }
+  /* The create pill keeps its glyph and loses its word: on a phone the
+     icon is unambiguous, and the head has no room to spare. */
+  .hn-index-new-label { display: none; }
 }
 
 /* ══════════════════════════════════════════════════
@@ -493,6 +496,52 @@
   white-space: nowrap;
 }
 .hn-index-spacer { flex: 1 1 auto; }
+
+/* ── Create: the index's only control that writes to the vault ──
+   A quiet pill, one step behind the rows: it should be findable when the
+   page is empty, never loud enough to compete with the note. */
+.hn-index-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  border: 1px solid var(--hn-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hn-text-muted);
+  font-family: inherit;
+  font-size: 0.8em;
+  font-weight: 500;
+  line-height: 1.6;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.hn-index-new:hover {
+  color: var(--hn-text);
+  border-color: var(--text-accent);
+  background: var(--background-modifier-hover, rgba(127, 127, 127, 0.08));
+}
+.hn-index-new:focus-visible {
+  outline: 2px solid var(--text-accent);
+  outline-offset: 1px;
+}
+.hn-index-new svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  color: currentColor;
+  opacity: 1;
+}
+
+/* Inline error inside the create dialog — the name needs fixing, so the
+   dialog stays open and says so in place. */
+.hn-create-error {
+  margin: 10px 0 0;
+  color: var(--text-error, #e93147);
+  font-size: 0.9em;
+}
 
 /* ── The list: one row per entry, folders first, generous rhythm ── */
 .hn-index-body { display: grid; gap: 1px; }

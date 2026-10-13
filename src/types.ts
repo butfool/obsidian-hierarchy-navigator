@@ -29,6 +29,20 @@ export interface HierarchyNavigatorSettings {
    */
   showBodyIndex: boolean;
 
+  /* ── Create ── */
+  /**
+   * Show a create button in the body index. This is the plugin's only write
+   * path: it adds a new note or folder and never touches an existing one, so
+   * it is also the one switch that makes the plugin strictly read-only again.
+   */
+  enableCreate: boolean;
+  /**
+   * Default state of the "also create a FolderNote" checkbox in the create
+   * dialog. The checkbox is always shown, so a one-off folder can still opt
+   * out without changing this.
+   */
+  createFolderNote: boolean;
+
   /* ── Layout ── */
   /**
    * How a section lays its items out:
@@ -58,6 +72,8 @@ export const DEFAULT_SETTINGS: HierarchyNavigatorSettings = {
   showFiles: true,
   showSiblings: false,
   showBodyIndex: true,
+  enableCreate: true,
+  createFolderNote: true,
   sectionLayout: "single-line",
   maxVisibleItems: 6,
   collapsed: false,

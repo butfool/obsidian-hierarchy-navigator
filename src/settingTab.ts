@@ -145,6 +145,33 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
         });
       });
 
+    /* ── Create ──
+       The plugin's only write path, so it gets its own section rather than
+       hiding among the display toggles. */
+    containerEl.createEl("h3", { text: t.createHeading });
+
+    new Setting(containerEl)
+      .setName(t.enableCreateName)
+      .setDesc(t.enableCreateDesc)
+      .addToggle((tg) => {
+        tg.setValue(this.plugin.settings.enableCreate);
+        tg.onChange(async (v) => {
+          this.plugin.settings.enableCreate = v;
+          await this.persist();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName(t.createFolderNoteName)
+      .setDesc(t.createFolderNoteDesc)
+      .addToggle((tg) => {
+        tg.setValue(this.plugin.settings.createFolderNote);
+        tg.onChange(async (v) => {
+          this.plugin.settings.createFolderNote = v;
+          await this.persist();
+        });
+      });
+
     /* ── Tips ── */
     containerEl.createEl("h3", { text: t.tipsHeading });
     containerEl.createEl("p", { text: t.tips });

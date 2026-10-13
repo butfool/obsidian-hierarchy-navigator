@@ -8,6 +8,7 @@ import type {
 import type HierarchyNavigator from "./main";
 import { Icons, fileTypeIcon, fileTypeClass } from "./icons";
 import { getStrings, type Strings } from "./i18n";
+import { promptCreateChild } from "./createModal";
 
 const ROOT = "/";
 const FOLDER_NOTE_SUFFIX = ".md";
@@ -835,7 +836,10 @@ export function renderBodyIndex(
         : plugin.settings.showFiles;
     })
     .sort(compareEntries);
-  if (items.length === 0) return null;
+  // An empty folder still has one reason to show this panel: its create
+  // button. That is the page where you most want to add the first thing — so
+  // with create switched off we keep the old behaviour and draw nothing.
+  if (items.length === 0 && !plugin.settings.enableCreate) return null;
 
   const root = el("div", { cls: INDEX_CLASS, attr: { "data-hn-file": file.path } });
   const t = getStrings(plugin.settings.language);
@@ -850,9 +854,38 @@ export function renderBodyIndex(
   head.appendChild(
     el("span", {
       cls: "hn-index-count",
-      text: t.bodyIndexCounts(folders, files),
+      text:
+        items.length === 0
+          ? t.bodyIndexNothing
+          : t.bodyIndexCounts(folders, files),
     }),
   );
+
+  /* ── Create: the one control that writes. It sits at the far end of the
+     head, next to the folder it will write into — this index *is* the "this
+     folder is empty" page, so it is the honest place to offer it. ── */
+  if (plugin.settings.enableCreate) {
+    head.appendChild(el("span", { cls: "hn-index-spacer" }));
+    const createButton = el("button", {
+      cls: "hn-index-new",
+      attr: {
+        type: "button",
+        "data-hn-create": file.path,
+        "aria-label": t.createAction,
+        title: t.createAction,
+      },
+      children: [
+        Icons.plus(),
+        el("span", { cls: "hn-index-new-label", text: t.createAction }),
+      ],
+    });
+    createButton.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      promptCreateChild(plugin, folder);
+    });
+    head.appendChild(createButton);
+  }
+
   inner.appendChild(head);
 
   /* ── Body: one calm list, folders first — the sort already put them there.

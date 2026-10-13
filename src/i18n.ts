@@ -25,6 +25,8 @@ export interface Strings {
   bodyIndexTitle: string;
   /** "3 folders · 12 files" under the heading. */
   bodyIndexCounts: (folders: number, files: number) => string;
+  /** Stands in for the counts when the folder holds nothing yet. */
+  bodyIndexNothing: string;
   /** Item count trailing a folder row. */
   folderItemCount: (count: number) => string;
   /** Relative timestamps trailing a file row. */
@@ -32,6 +34,42 @@ export interface Strings {
   minutesAgo: (count: number) => string;
   hoursAgo: (count: number) => string;
   daysAgo: (count: number) => string;
+
+  /* ── Create ── */
+  /** Text of the create button in the body index head. */
+  createAction: string;
+  /** Dialog title — "New in <folder>". */
+  createTitle: (folder: string) => string;
+  /** Label of the note / folder selector. */
+  createKindLabel: string;
+  /** Selector option: a markdown note. */
+  createKindNote: string;
+  /** Selector option: a folder. */
+  createKindFolder: string;
+  /** Label of the name field. */
+  createNameLabel: string;
+  /** Placeholder shown in the empty name field. */
+  createNamePlaceholder: string;
+  /** Where it will land, under the name field. */
+  createDestination: (path: string) => string;
+  /** Label of the "also create a FolderNote" checkbox. */
+  createFolderNoteLabel: string;
+  /** What that checkbox will do, naming the folder note it implies. */
+  createFolderNoteDesc: (name: string) => string;
+  /** Dialog confirm button. */
+  createSubmit: string;
+  /** Dialog cancel button. */
+  createCancel: string;
+  /** Inline error: no usable name. */
+  createInvalidName: string;
+  /** Inline error: something already sits at that path. */
+  createExists: string;
+  /** Inline error for anything the vault itself refused. */
+  createFailed: (message: string) => string;
+  /** Notice after a note was created. */
+  createdNote: (name: string) => string;
+  /** Notice after a folder was created. */
+  createdFolder: (name: string) => string;
 
   /* ── Commands ── */
   revealParentCommand: string;
@@ -66,6 +104,11 @@ export interface SettingsStrings {
   bodyIndexHeading: string;
   showBodyIndexName: string;
   showBodyIndexDesc: string;
+  createHeading: string;
+  enableCreateName: string;
+  enableCreateDesc: string;
+  createFolderNoteName: string;
+  createFolderNoteDesc: string;
   tipsHeading: string;
   tips: string;
 }
@@ -86,11 +129,30 @@ const en: Strings = {
   bodyIndexCounts: (folders, files) =>
     `${folders} ${folders === 1 ? "folder" : "folders"} · ` +
     `${files} ${files === 1 ? "file" : "files"}`,
-  folderItemCount: (count) => `${count} ${count === 1 ? "item" : "items"}`,
+  bodyIndexNothing: "Nothing here yet",  folderItemCount: (count) => `${count} ${count === 1 ? "item" : "items"}`,
   justNow: "just now",
   minutesAgo: (count) => `${count} min ago`,
   hoursAgo: (count) => (count === 1 ? "1 hour ago" : `${count} hours ago`),
   daysAgo: (count) => (count === 1 ? "1 day ago" : `${count} days ago`),
+
+  createAction: "New",
+  createTitle: (folder) => `New in “${folder}”`,
+  createKindLabel: "Type",
+  createKindNote: "Note",
+  createKindFolder: "Folder",
+  createNameLabel: "Name",
+  createNamePlaceholder: "Untitled",
+  createDestination: (path) => `Will be created in ${path}`,
+  createFolderNoteLabel: "Also create a FolderNote",
+  createFolderNoteDesc: (name) =>
+    `Adds ${name}/${name}.md, so the new folder is navigable straight away`,
+  createSubmit: "Create",
+  createCancel: "Cancel",
+  createInvalidName: 'A name is required, without \\ / : * ? " < > | in it',
+  createExists: "A note or folder with that name is already here",
+  createFailed: (message) => `Could not create it: ${message}`,
+  createdNote: (name) => `Created “${name}”`,
+  createdFolder: (name) => `Created folder “${name}”`,
 
   revealParentCommand: "Reveal parent folder in file explorer",
   openFirstChildCommand: "Open the first child file",
@@ -149,6 +211,17 @@ const en: Strings = {
       "editing and it is simply not there, so it can never come between you " +
       "and what you are writing. Nothing is " +
       "written to disk and the header block is never touched.",
+    createHeading: "Create",
+    enableCreateName: "Show a create button in the body index",
+    enableCreateDesc:
+      "Adds a “New” button to an empty Folder Note's index, which creates a " +
+      "note or a folder inside that folder. This is the only path where the " +
+      "plugin writes to the vault; it never edits an existing note. Turn it " +
+      "off to keep the plugin strictly read-only.",
+    createFolderNoteName: "Create a FolderNote with a new folder",
+    createFolderNoteDesc:
+      "Default state of the checkbox in the create dialog. Untick it there " +
+      "for a single folder without changing this.",
     tipsHeading: "Tips",
     tips:
       "Add `hierarchy-nav: hide` to a note's frontmatter to exclude it from " +
@@ -164,11 +237,31 @@ const zh: Strings = {
 
   bodyIndexTitle: "子节点",
   bodyIndexCounts: (folders, files) => `${folders} 文件夹 · ${files} 文件`,
+  bodyIndexNothing: "还没有内容",
   folderItemCount: (count) => `${count} 项`,
   justNow: "刚刚",
   minutesAgo: (count) => `${count} 分钟前`,
   hoursAgo: (count) => `${count} 小时前`,
   daysAgo: (count) => `${count} 天前`,
+
+  createAction: "新建",
+  createTitle: (folder) => `在「${folder}」中新建`,
+  createKindLabel: "类型",
+  createKindNote: "笔记",
+  createKindFolder: "文件夹",
+  createNameLabel: "名称",
+  createNamePlaceholder: "未命名",
+  createDestination: (path) => `将创建于 ${path}`,
+  createFolderNoteLabel: "同时创建 FolderNote",
+  createFolderNoteDesc: (name) =>
+    `在新文件夹内附带 ${name}/${name}.md，它立刻可以在层级里导航`,
+  createSubmit: "创建",
+  createCancel: "取消",
+  createInvalidName: "需要填写名称，且不能包含 \\ / : * ? \" < > |",
+  createExists: "同名笔记或文件夹已存在",
+  createFailed: (message) => `创建失败：${message}`,
+  createdNote: (name) => `已新建「${name}」`,
+  createdFolder: (name) => `已新建文件夹「${name}」`,
 
   revealParentCommand: "在文件浏览器中定位父文件夹",
   openFirstChildCommand: "打开第一个子文件",
@@ -217,6 +310,16 @@ const zh: Strings = {
       "时间。它是笔记里的一个块，因此随正文一起滚动，也留在正文栏内；" +
       "只在阅读模式显示，切到编辑模式它就不在，因此永远不会挡住你正在" +
       "写的内容。不写入磁盘，也不影响顶部区块。",
+    createHeading: "新建",
+    enableCreateName: "在正文索引中显示新建按钮",
+    enableCreateDesc:
+      "空正文的 Folder Note 索引右上角会出现「新建」，可在该文件夹里" +
+      "新建笔记或文件夹。这是本插件唯一会写入 vault 的路径，且从不改动" +
+      "已有笔记；关掉它插件就回到严格的只读状态。",
+    createFolderNoteName: "新建文件夹时同时创建 FolderNote",
+    createFolderNoteDesc:
+      "弹窗里那个勾选框的默认状态。只想给某一个文件夹跳过时，在弹窗里" +
+      "取消勾选即可，不必改这里。",
     tipsHeading: "提示",
     tips: "在笔记的 frontmatter 中加入 `hierarchy-nav: hide`，即可让该笔记完全跳过本插件。",
   },

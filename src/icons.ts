@@ -134,6 +134,11 @@ export const Icons = {
     <rect x="3.5" y="13.5" width="7" height="7" rx="2"/>
     <rect x="13.5" y="13.5" width="7" height="7" rx="2"/>
   `),
+
+  /** Plus — the body index's create affordance. */
+  plus: (): SVGElement => wrap(`
+    <path d="M12 5v14M5 12h14"/>
+  `),
 };
 
 /* ────────────────────────────────────────────────
