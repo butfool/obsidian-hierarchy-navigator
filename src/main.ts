@@ -33,7 +33,6 @@ export default class HierarchyNavigator
   implements HierarchyNavigatorPlugin
 {
   public settings: HierarchyNavigatorSettings;
-  private pendingTitleRetries = new WeakSet<WorkspaceLeaf>();
   /** Command-registry entries, kept so their names can follow the language. */
   private revealParentCommand: Command | null = null;
   private openFirstChildCommand: Command | null = null;
@@ -205,8 +204,16 @@ export default class HierarchyNavigator
     return f instanceof TFile ? f : null;
   }
 
-  /** Mount (or refresh) the block in the given leaf's markdown view. */
-  private mountInto(leaf: WorkspaceLeaf): void {
+  /**
+   * Mount (or refresh) the block in the given leaf's markdown view.
+   *
+   * `retried` marks the second attempt of a mount whose view had no title yet:
+   * the title is rendered asynchronously on first open, so the first attempt
+   * waits one frame for it, and the second takes the title-less insertion
+   * point rather than waiting again. Without that ceiling, a view that never
+   * renders a title would rebuild its block once per frame, forever.
+   */
+  private mountInto(leaf: WorkspaceLeaf, retried = false): void {
     const view = leaf.view;
     if (!(view instanceof MarkdownView)) return;
 
@@ -277,12 +284,10 @@ export default class HierarchyNavigator
 
       // The title is rendered asynchronously on first open. Give Obsidian one
       // frame to add it before choosing a fallback insertion point.
-      if (!this.pendingTitleRetries.has(leaf)) {
-        this.pendingTitleRetries.add(leaf);
+      if (!retried) {
         window.requestAnimationFrame(() => {
-          this.pendingTitleRetries.delete(leaf);
           if (view.file === file) {
-            this.mountInto(leaf);
+            this.mountInto(leaf, true);
           }
         });
         return false;
