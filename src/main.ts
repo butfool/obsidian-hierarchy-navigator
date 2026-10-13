@@ -3,7 +3,6 @@ import {
   TFile,
   MarkdownView,
   WorkspaceLeaf,
-  View,
   type Command,
 } from "obsidian";
 import {
@@ -416,9 +415,6 @@ export default class HierarchyNavigator
 
   private iterateMarkdownViews(fn: (view: MarkdownView) => void): void {
     this.app.workspace.iterateAllLeaves((leaf) => {
-      if (leaf instanceof View && "getMode" in leaf.view) {
-        // no-op — guard to keep TS happy on runtime duck-typing
-      }
       const view = leaf.view;
       if (view instanceof MarkdownView) fn(view);
     });
