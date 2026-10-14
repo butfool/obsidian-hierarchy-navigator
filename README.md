@@ -10,7 +10,7 @@
   <a href="README.en.md">English</a>
 </p>
 
-[![Version](https://img.shields.io/badge/Version-0.3.1-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
+[![Version](https://img.shields.io/badge/Version-0.3.2-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.4.0%2B-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md)
 [![License](https://img.shields.io/badge/License-MIT-3DA639?logo=opensourceinitiative&logoColor=white)](LICENSE)
 
