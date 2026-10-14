@@ -24,9 +24,8 @@ import {
   INDEX_CLASS,
   OWNED_SELECTOR,
   PROPERTIES_SELECTOR,
+  destroyOwnedElement,
 } from "./renderer";
-
-const PLUGIN_NAME = "Hierarchy Navigator";
 
 export default class HierarchyNavigator
   extends Plugin
@@ -149,11 +148,9 @@ export default class HierarchyNavigator
 
     // ── Setting tab ──
     this.addSettingTab(new HierarchyNavigatorSettingTab(this.app, this));
-    console.log(`${PLUGIN_NAME}: loaded`);
   }
 
   onunload(): void {
-    console.log(`${PLUGIN_NAME}: unloaded`);
     // Defensive: drop our DOM from any view that still has it, so
     // reloading the plugin doesn't accumulate duplicates if hot-reload
     // doesn't fully reinstantiate Obsidian's view tree.
@@ -404,7 +401,10 @@ export default class HierarchyNavigator
 
   /** Remove everything this plugin owns in a container. */
   private removeOwned(host: HTMLElement): void {
-    host.querySelectorAll<HTMLElement>(OWNED_SELECTOR).forEach((node) => node.remove());
+    host.querySelectorAll<HTMLElement>(OWNED_SELECTOR).forEach((node) => {
+      destroyOwnedElement(node);
+      node.remove();
+    });
   }
 
   /** Walk every markdown leaf and (re-)mount if it's a preview leaf. */
@@ -414,8 +414,8 @@ export default class HierarchyNavigator
 
   /** Refresh the active leaf — used when settings change in-flight. */
   private syncActiveLeaf(): void {
-    const leaf = this.app.workspace.activeLeaf;
-    if (leaf) this.mountInto(leaf);
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (view) this.mountInto(view.leaf);
   }
 
   private iterateMarkdownViews(fn: (view: MarkdownView) => void): void {

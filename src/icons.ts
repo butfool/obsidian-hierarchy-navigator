@@ -6,17 +6,16 @@
 
 const NS = "http://www.w3.org/2000/svg";
 
-const wrap = (paths: string): SVGElement => {
-  const svg = document.createElementNS(NS, "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "1.6");
-  svg.setAttribute("stroke-linecap", "round");
-  svg.setAttribute("stroke-linejoin", "round");
-  svg.innerHTML = paths;
-  return svg;
-};
+function wrap(paths: string): SVGElement {
+  const parsed = new DOMParser().parseFromString(
+    `<svg xmlns="${NS}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`,
+    "image/svg+xml",
+  );
+  if (parsed.documentElement.localName !== "svg") {
+    throw new Error("Failed to parse an internal SVG icon");
+  }
+  return document.importNode(parsed.documentElement, true) as unknown as SVGElement;
+}
 
 export const Icons = {
   /** Folder icon — outline, stroked. */

@@ -397,15 +397,20 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
   });
 
   // Covers keyboard-opened panels (no pointer ever left them) and clicks
-  // elsewhere on the note. Self-detaches once the block is discarded.
+  // elsewhere on the note. The owner releases this listener when discarded.
   const onPointerDown = (ev: PointerEvent) => {
-    if (!more.isConnected) {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      return;
-    }
     if (isOpen() && !more.contains(ev.target as Node)) close();
   };
   document.addEventListener("pointerdown", onPointerDown, true);
+
+  const destroy = () => {
+    window.clearTimeout(openTimer);
+    window.clearTimeout(closeTimer);
+    window.clearTimeout(hideTimer);
+    document.removeEventListener("pointerdown", onPointerDown, true);
+    more.open = false;
+  };
+  overflowDestroyers.set(more, destroy);
 
   return {
     root: more,
@@ -436,6 +441,20 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
  * guessed), so `main.ts` runs them right after mounting.
  */
 const refitters = new WeakMap<HTMLElement, Array<() => void>>();
+const overflowDestroyers = new WeakMap<HTMLElement, () => void>();
+
+/** Release listeners and timers owned by a rendered plugin element. */
+export function destroyOwnedElement(element: HTMLElement): void {
+  const overflowElements = [
+    ...(element.matches(".hn-more") ? [element] : []),
+    ...Array.from(element.querySelectorAll<HTMLElement>(".hn-more")),
+  ];
+  overflowElements.forEach((overflow) => {
+    overflowDestroyers.get(overflow)?.();
+    overflowDestroyers.delete(overflow);
+  });
+  refitters.delete(element);
+}
 
 /** Re-fit every single-line section of a mounted block to its real width. */
 export function refitSections(block: HTMLElement): void {

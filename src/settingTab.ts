@@ -24,7 +24,7 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
     // itself uses, so the tab is in whatever language the plugin is set to.
     const t = getStrings(this.plugin.settings.language).settings;
 
-    containerEl.createEl("h2", { text: "Hierarchy Navigator" });
+    new Setting(containerEl).setName("Hierarchy Navigator").setHeading();
     containerEl.createEl("p", { text: t.intro });
 
     // Language first: it is the setting that decides how this very page reads,
@@ -54,7 +54,7 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       });
 
     /* ── Sections ── */
-    containerEl.createEl("h3", { text: t.sectionsHeading });
+    new Setting(containerEl).setName(t.sectionsHeading).setHeading();
 
     new Setting(containerEl)
       .setName(t.showParentName)
@@ -101,7 +101,7 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       });
 
     /* ── Layout ── */
-    containerEl.createEl("h3", { text: t.layoutHeading });
+    new Setting(containerEl).setName(t.layoutHeading).setHeading();
 
     new Setting(containerEl)
       .setName(t.sectionLayoutName)
@@ -132,7 +132,7 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       });
 
     /* ── Body index ── */
-    containerEl.createEl("h3", { text: t.bodyIndexHeading });
+    new Setting(containerEl).setName(t.bodyIndexHeading).setHeading();
 
     new Setting(containerEl)
       .setName(t.showBodyIndexName)
@@ -148,7 +148,7 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
     /* ── Create ──
        The plugin's only write path, so it gets its own section rather than
        hiding among the display toggles. */
-    containerEl.createEl("h3", { text: t.createHeading });
+    new Setting(containerEl).setName(t.createHeading).setHeading();
 
     new Setting(containerEl)
       .setName(t.enableCreateName)
@@ -173,7 +173,7 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       });
 
     /* ── Tips ── */
-    containerEl.createEl("h3", { text: t.tipsHeading });
+    new Setting(containerEl).setName(t.tipsHeading).setHeading();
     containerEl.createEl("p", { text: t.tips });
   }
 }
