@@ -40,6 +40,7 @@ Hierarchy Navigator renders a parent / siblings / children navigation block at t
 - 配合 Folder Note 工作，Folder Note 会以它所代表的文件夹参与导航
 - 依据 Obsidian 自己的视图注册表过滤扩展名，只显示能被打开的文件
 - 区块内文件夹排在文件前面，按自然顺序排列，`9` 排在 `10` 之前
+- 文件夹与笔记使用统一尺寸的导航胶囊；Folder Note 通过蓝色图标区分
 - 每个条目按文件类型着色区分：笔记、Canvas、Base、PDF、图片、音频、视频、代码
 - Folder Note 正文为空时，在正文区渲染子项索引，可直接在其中新建笔记或文件夹
 - 新建操作走 Obsidian 自身的 `createNewMarkdownFile`，不会覆盖已存在的路径

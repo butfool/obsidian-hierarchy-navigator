@@ -202,7 +202,15 @@
   row-gap: 4px;
 }
 
-.hn-pill {
+/* Links open notes; buttons reveal folders. Override Obsidian's button
+   defaults so both use the same compact pill, including hover and focus. */
+.hn-root .hn-pill {
+  appearance: none;
+  box-sizing: border-box;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  box-shadow: none;
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
@@ -213,6 +221,9 @@
   background: transparent;
   color: var(--hn-text);
   font-family: inherit;
+  font-weight: inherit;
+  text-align: start;
+  justify-content: flex-start;
   text-decoration: none;
   cursor: pointer;
   font-size: 0.95em;
@@ -222,12 +233,17 @@
   white-space: nowrap;
 }
 
-.hn-pill:hover {
+.hn-root .hn-pill:hover {
   background: var(--background-modifier-hover, rgba(127, 127, 127, 0.08));
   border-color: var(--background-modifier-border-hover, var(--hn-border));
 }
 
-.hn-pill:active { transform: translateY(1px); }
+.hn-root .hn-pill:active { transform: translateY(1px); }
+
+.hn-root .hn-pill:focus-visible {
+  outline: 2px solid var(--text-accent);
+  outline-offset: -2px;
+}
 
 .hn-pill svg {
   width: 12px;

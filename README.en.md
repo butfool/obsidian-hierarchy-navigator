@@ -36,6 +36,7 @@ Inspired by SiYuan's [`hierarchyNavigate`](https://github.com/OpaqueGlass/syplug
 - Works with Folder Note, so a Folder Note navigates as the folder it represents
 - Filters extensions through Obsidian's own view registry, showing only files the app can open
 - Sorts folders before files in natural order, so `9` comes before `10`
+- Uses consistently sized navigation pills for folders and notes; Folder Notes have an accent-colored icon
 - Tints each pill by file type: note, Canvas, Base, PDF, image, audio, video, code
 - Renders a children index inside the note body while a Folder Note is still empty, with a button to create notes and folders there
 - Creates notes through Obsidian's own `createNewMarkdownFile`, never overwriting an existing path
