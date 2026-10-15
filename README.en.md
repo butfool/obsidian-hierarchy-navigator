@@ -10,7 +10,7 @@
   <strong>English</strong>
 </p>
 
-[![Version](https://img.shields.io/badge/Version-0.3.2-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
+[![Version](https://img.shields.io/badge/Version-0.3.3-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.13.0%2B-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md)
 [![License](https://img.shields.io/badge/License-MIT-3DA639?logo=opensourceinitiative&logoColor=white)](LICENSE)
 
@@ -111,14 +111,14 @@ The `.github/workflows/release.yml` workflow builds only the committed source at
 3. Create and push a tag that exactly matches the manifest version, without a `v` prefix:
 
 ```bash
-git tag -a 0.3.2 -m "0.3.2"
-git push origin 0.3.2
+git tag -a 0.3.3 -m "0.3.3"
+git push origin 0.3.3
 ```
 
 4. Wait for **Actions → Release Obsidian plugin** to succeed. It creates a draft release with `main.js`, `manifest.json`, and `styles.css` attached.
 5. Check the assets and release notes, then select **Publish release**. Draft releases are not public installation sources.
 
-The `0.3.2` tag above is only a next-version example; replace it with the actual manifest version. Initial inclusion in the official community directory requires a separate submission at [community.obsidian.md](https://community.obsidian.md/). A GitHub release alone does not list the plugin there.
+The `0.3.3` tag above is only a next-version example; replace it with the actual manifest version. Initial inclusion in the official community directory requires a separate submission at [community.obsidian.md](https://community.obsidian.md/). A GitHub release alone does not list the plugin there.
 
 ## License
 

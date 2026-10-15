@@ -1,6 +1,6 @@
 {
   "name": "obsidian-hierarchy-navigator",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Render a parent / children navigation block at the top of any Folder Note (SiYuan hierarchyNavigate, but for Obsidian). Source files are never modified.",
   "main": "main.js",
   "scripts": {

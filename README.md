@@ -10,7 +10,7 @@
   <a href="README.en.md">English</a>
 </p>
 
-[![Version](https://img.shields.io/badge/Version-0.3.2-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
+[![Version](https://img.shields.io/badge/Version-0.3.3-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.13.0%2B-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md)
 [![License](https://img.shields.io/badge/License-MIT-3DA639?logo=opensourceinitiative&logoColor=white)](LICENSE)
 
@@ -115,14 +115,14 @@ npm run dev      # 监听 src/ 目录，每次改动重新构建 main.js
 3. 创建与 manifest 版本完全相同的标签（不带 `v`），例如：
 
 ```bash
-git tag -a 0.3.2 -m "0.3.2"
-git push origin 0.3.2
+git tag -a 0.3.3 -m "0.3.3"
+git push origin 0.3.3
 ```
 
 4. 等待 **Actions → Release Obsidian plugin** 成功。它会创建草稿 Release，并上传 `main.js`、`manifest.json`、`styles.css`。
 5. 核对附件和发布说明，然后选择 **Publish release**。草稿尚不能作为公开安装来源。
 
-上面的 `0.3.2` 仅为下一版本示例，必须替换成 manifest 中的实际版本。首次进入官方社区目录仍需单独在 [community.obsidian.md](https://community.obsidian.md/) 提交，创建 GitHub Release 不等于已经上架。
+上面的 `0.3.3` 仅为下一版本示例，必须替换成 manifest 中的实际版本。首次进入官方社区目录仍需单独在 [community.obsidian.md](https://community.obsidian.md/) 提交，创建 GitHub Release 不等于已经上架。
 
 ## License
 
