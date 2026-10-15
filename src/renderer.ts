@@ -3,7 +3,6 @@ import type {
   AnyApp,
   FolderNoteAPI,
   HomepagePluginAPI,
-  HierarchyNavigatorSettings,
 } from "./types";
 import type HierarchyNavigator from "./main";
 import { Icons, fileTypeIcon, fileTypeClass } from "./icons";
@@ -212,18 +211,12 @@ function el<K extends keyof HTMLElementTagNameMap>(
     children?: (Element | string)[];
   } = {},
 ): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (opts.cls) node.className = opts.cls;
-  if (opts.text !== undefined) node.textContent = opts.text;
-  if (opts.attr) {
-    for (const [k, v] of Object.entries(opts.attr)) node.setAttribute(k, v);
-  }
-  if (opts.children) {
-    for (const c of opts.children) {
-      if (typeof c === "string") node.appendChild(document.createTextNode(c));
-      else node.appendChild(c);
-    }
-  }
+  const node = createEl(tag, {
+    cls: opts.cls,
+    text: opts.text,
+    attr: opts.attr,
+  });
+  node.append(...(opts.children ?? []));
   return node;
 }
 
@@ -232,7 +225,7 @@ function openTarget(
   target: TFile | TFolder,
 ): void {
   if (target instanceof TFile) {
-    plugin.app.workspace.openLinkText(target.path, "", false);
+    void plugin.app.workspace.openLinkText(target.path, "", false);
     return;
   }
   const explorer = plugin.app.workspace.getLeavesOfType("file-explorer")[0];
@@ -373,7 +366,7 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
     menu.replaceChildren(
       ...overflowItems.map((item, index) => {
         const pill = makePill(plugin, item);
-        pill.style.setProperty("--hn-i", String(Math.min(index, 6)));
+        pill.setCssProps({ "--hn-i": String(Math.min(index, 6)) });
         return pill;
       }),
     );
@@ -390,7 +383,7 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
     // travel from the chip into the panel without crossing dead space.
     // `offsetWidth` is the layout width — at this instant the panel still
     // carries its 0.97 entry scale, which a bounding rect would report.
-    more.style.setProperty("--hn-bridge-w", `${menu.offsetWidth}px`);
+    more.setCssProps({ "--hn-bridge-w": `${menu.offsetWidth}px` });
     more.classList.add("hn-open");
   };
   const close = () => {
@@ -469,7 +462,7 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
         getStrings(plugin.settings.language).overflowChip(items.length),
       );
       // Nothing left over: the chip takes no room at all.
-      more.style.display = items.length > 0 ? "" : "none";
+      more.classList.toggle("hn-hidden", items.length === 0);
       if (items.length === 0) close();
     },
   };
@@ -508,7 +501,6 @@ function buildSegment(
 ): HTMLElement {
   const root = el("div", { cls: "hn-segment" });
   // Head and body become the two cells of one grid row in `.hn-segments`.
-  root.style.setProperty("display", "contents", "important");
   const head = el("div", { cls: "hn-segment-head" });
   head.appendChild(seg.icon);
   head.appendChild(el("span", { cls: "hn-segment-label", text: seg.label }));
@@ -687,19 +679,6 @@ export function renderHierarchyBlock(
   // Section layout rides on the block root so styles.css can switch the
   // pill rows between one clipped line and free wrapping.
   if (settings.sectionLayout === "wrap") block.classList.add("hn-wrap");
-  // Inline layout constraints are intentional here: the vault's
-  // `list-cards` class applies a grid/flex layout to every direct
-  // child of the preview section. A stylesheet rule can lose to that
-  // user rule; these scoped inline constraints guarantee that the
-  // navigation becomes its own full-width row below the title.
-  block.style.setProperty("display", "block", "important");
-  block.style.setProperty("grid-column", "1 / -1", "important");
-  block.style.setProperty("grid-row", "auto", "important");
-  block.style.setProperty("width", "100%", "important");
-  block.style.setProperty("max-width", "none", "important");
-  block.style.setProperty("margin-left", "0", "important");
-  block.style.setProperty("margin-right", "0", "important");
-  block.style.setProperty("float", "none", "important");
   block.setAttribute("data-hn-placement", "after-title");
   // The header row doubles as the collapse toggle: clicking anywhere on it
   // folds the whole block. The chevron sits left of the label, following
@@ -740,7 +719,9 @@ export function renderHierarchyBlock(
     const next = !block.classList.contains("hn-collapsed");
     plugin.settings.collapsed = next;
     applyCollapsed(next);
-    void plugin.saveSettings();
+    void plugin.saveSettings().catch(() => {
+      // The in-memory state is already applied; a later refresh can retry it.
+    });
   };
   rail.addEventListener("click", toggleCollapsed);
   rail.addEventListener("keydown", (ev: KeyboardEvent) => {
@@ -752,21 +733,13 @@ export function renderHierarchyBlock(
   block.appendChild(rail);
 
   const segments = el("div", { cls: "hn-segments" });
-  segments.style.setProperty("display", "grid", "important");
-  segments.style.setProperty("grid-template-columns", "max-content 1fr", "important");
-  // A wrapped row is taller than one line: keep the section label on the
-  // first line instead of floating it in the middle of the stack.
-  segments.style.setProperty("align-items", settings.sectionLayout === "wrap" ? "start" : "center", "important");
-  segments.style.setProperty("column-gap", "10px", "important");
-  segments.style.setProperty("row-gap", "6px", "important");
+  segments.classList.toggle("hn-wrap", settings.sectionLayout === "wrap");
   const refits: Array<() => void> = [];
   const onRefit = (fn: () => void) => refits.push(fn);
   if (parentSeg) segments.appendChild(buildSegment(plugin, parentSeg, onRefit));
   if (siblingsSeg) segments.appendChild(buildSegment(plugin, siblingsSeg, onRefit));
   if (childrenSeg) segments.appendChild(buildSegment(plugin, childrenSeg, onRefit));
-  // The wrapper exists purely so the fold can animate: `grid-template-rows`
-  // goes 1fr ↔ 0fr, which cannot be done on `.hn-segments` itself (it has an
-  // inline `display: grid !important` and must stay that way).
+  // The wrapper exists purely so the fold can animate its grid row.
   const fold = el("div", { cls: "hn-fold" });
   fold.appendChild(segments);
   block.appendChild(fold);
@@ -956,43 +929,40 @@ export function renderBodyIndex(
      time. No tiles, no panel: a launcher, not a dashboard. ── */
   const body = el("div", { cls: "hn-index-body" });
   for (const entry of items) {
-    const isDir = entry instanceof TFolder;
-    const folderEntry = isDir ? (entry as TFolder) : null;
-    const fileEntry = isDir ? null : (entry as TFile);
-    const folderNote = folderEntry ? findFolderNoteFile(plugin, folderEntry) : null;
-
-    const row = el("a", {
-      cls:
-        `hn-index-row${isDir ? " hn-index-dir" : ""}` +
-        (fileEntry ? ` ${fileTypeClass(fileEntry.extension)}` : "") +
-        (folderNote ? " hn-kind-folder-note" : ""),
-      attr: { href: entry.path },
-    });
-    row.appendChild(
-      folderEntry
-        ? folderNote
-          ? Icons.folderNote()
-          : Icons.folder()
-        : fileTypeIcon((fileEntry as TFile).extension),
-    );
-    row.appendChild(
-      el("span", {
-        cls: "hn-index-name",
-        text: folderEntry ? folderEntry.name : (fileEntry as TFile).basename,
-      }),
-    );
-    row.appendChild(
-      el("span", {
-        cls: "hn-index-meta",
-        text: folderEntry
-          ? t.folderItemCount(folderEntry.children?.length ?? 0)
-          : relativeTime((fileEntry as TFile).stat?.mtime ?? 0, t),
-      }),
-    );
-    row.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      openTarget(plugin, folderNote ?? entry);
-    });
+    const row = el("a", { cls: "hn-index-row", attr: { href: entry.path } });
+    if (entry instanceof TFolder) {
+      const folderNote = findFolderNoteFile(plugin, entry);
+      row.classList.add("hn-index-dir");
+      if (folderNote) row.classList.add("hn-kind-folder-note");
+      row.appendChild(folderNote ? Icons.folderNote() : Icons.folder());
+      row.appendChild(el("span", { cls: "hn-index-name", text: entry.name }));
+      row.appendChild(
+        el("span", {
+          cls: "hn-index-meta",
+          text: t.folderItemCount(entry.children?.length ?? 0),
+        }),
+      );
+      row.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        openTarget(plugin, folderNote ?? entry);
+      });
+    } else if (entry instanceof TFile) {
+      row.classList.add(fileTypeClass(entry.extension));
+      row.appendChild(fileTypeIcon(entry.extension));
+      row.appendChild(el("span", { cls: "hn-index-name", text: entry.basename }));
+      row.appendChild(
+        el("span", {
+          cls: "hn-index-meta",
+          text: relativeTime(entry.stat?.mtime ?? 0, t),
+        }),
+      );
+      row.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        openTarget(plugin, entry);
+      });
+    } else {
+      continue;
+    }
     body.appendChild(row);
   }
   inner.appendChild(body);

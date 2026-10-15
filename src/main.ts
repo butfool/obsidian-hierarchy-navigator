@@ -1,6 +1,7 @@
 import {
   Plugin,
   TFile,
+  TAbstractFile,
   MarkdownView,
   WorkspaceLeaf,
   type Command,
@@ -79,7 +80,7 @@ export default class HierarchyNavigator
 
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf) => {
-        if (leaf) this.mountInto(leaf as WorkspaceLeaf);
+        if (leaf) this.mountInto(leaf);
       }),
     );
 
@@ -158,7 +159,7 @@ export default class HierarchyNavigator
         if (checking) return true;
 
         const explorer = this.app.workspace.getLeavesOfType("file-explorer")[0] as
-          | { view?: { revealInFolder?: (t: unknown) => void } }
+          | { view?: { revealInFolder?: (file: TAbstractFile) => void } }
           | undefined;
         if (file.parent) explorer?.view?.revealInFolder?.(file.parent);
         return true;
@@ -177,10 +178,10 @@ export default class HierarchyNavigator
 
         const child = children[0];
         const explorer = this.app.workspace.getLeavesOfType("file-explorer")[0] as
-          | { view?: { revealInFolder?: (t: unknown) => void } }
+          | { view?: { revealInFolder?: (file: TAbstractFile) => void } }
           | undefined;
         if (child instanceof TFile) {
-          this.app.workspace.openLinkText(child.path, "", false);
+          void this.app.workspace.openLinkText(child.path, "", false);
         } else {
           explorer?.view?.revealInFolder?.(child);
         }

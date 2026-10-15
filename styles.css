@@ -28,17 +28,17 @@
      navigation occupy a full row instead of landing in the grid's
      second column beside the title. These are layout-only rules and
      remain scoped to our root class. */
-  grid-column: 1 / -1 !important;
-  grid-row: auto !important;
-  justify-self: stretch !important;
-  align-self: stretch !important;
-  flex: 0 0 100% !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: none !important;
-  float: none !important;
-  clear: both !important;
-  margin: 4px 0 14px 0 !important;
+  grid-column: 1 / -1;
+  grid-row: auto;
+  justify-self: stretch;
+  align-self: stretch;
+  flex: 0 0 100%;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  float: none;
+  clear: both;
+  margin: 4px 0 14px;
   padding: 0;
   background: transparent;
   border: 0;
@@ -85,10 +85,7 @@
 
 .hn-rail-label { white-space: nowrap; }
 
-/* ── Fold wrapper ──
-   The collapsible body lives here so the fold can animate: the wrapper's
-   `grid-template-rows` tweens 1fr ↔ 0fr. The segments themselves keep
-   their own grid (they carry an inline `display: grid !important`). */
+/* ── Fold wrapper ── */
 .hn-fold {
   display: grid;
   grid-template-rows: 1fr;
@@ -119,24 +116,23 @@
 
 /* ── Segments row: Pill chips for each item ── */
 .hn-segments {
-  /* Two-column grid: the label column is sized to the widest label and
-     every row's content column starts at the exact same x. Segments use
-     `display: contents`, so their head and body become the two cells of
-     one row. */
-  display: grid !important;
-  grid-template-columns: max-content 1fr !important;
-  align-items: center !important;
-  column-gap: 10px !important;
-  row-gap: 6px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   padding: 0;
   margin: 0;
   list-style: none;
 }
 
 .hn-segment {
-  /* The segment box itself disappears; its head and body join the parent
-     grid as aligned columns. */
-  display: contents !important;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.hn-segments.hn-wrap .hn-segment {
+  align-items: start;
 }
 
 /* "Parent", "Siblings", "Children" labels — keep the icon
@@ -176,6 +172,8 @@
   flex: 1 1 auto;
   min-width: 0;
 }
+
+.hn-hidden { display: none; }
 
 /* Pills row — always a single line; items above the configured limit
    collapse into the "+N" dropdown rendered right after it. */

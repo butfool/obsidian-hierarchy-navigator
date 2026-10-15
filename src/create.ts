@@ -36,9 +36,6 @@ export type CreateResult =
 
 /** Characters no vault path may hold — the separator included. */
 const INVALID_NAME = /[\\/:*?"<>|]/;
-/** Control characters, which `vault.create` rejects as well. */
-const CONTROL_CHARS = /[\u0000-\u001f]/;
-
 /**
  * `fileManager.createNewMarkdownFile` is what Obsidian's own "New note" calls:
  * it is the only way to get the user's default frontmatter and template
@@ -60,7 +57,11 @@ export function normalizeName(kind: CreateKind, raw: string): string {
 /** Empty, "." / "..", or holding something a path cannot. */
 export function isUsableName(name: string): boolean {
   if (!name || name === "." || name === "..") return false;
-  return !INVALID_NAME.test(name) && !CONTROL_CHARS.test(name);
+  if (INVALID_NAME.test(name)) return false;
+  for (const char of name) {
+    if (char.charCodeAt(0) <= 0x1f) return false;
+  }
+  return true;
 }
 
 /** Vault-absolute path of `name` inside `parent`. */
