@@ -3,7 +3,7 @@
 <h1>Hierarchy Navigator</h1>
 
 <p><strong>在每篇笔记顶部渲染「父级 / 兄弟 / 子级」导航块的 Obsidian 插件</strong></p>
-<p>需要 Obsidian 1.4.0 或更高版本</p>
+<p>需要 Obsidian 1.13.0 或更高版本</p>
 
 <p>
   <strong>简体中文</strong> |
@@ -11,7 +11,7 @@
 </p>
 
 [![Version](https://img.shields.io/badge/Version-0.3.2-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
-[![Obsidian](https://img.shields.io/badge/Obsidian-1.4.0%2B-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md)
+[![Obsidian](https://img.shields.io/badge/Obsidian-1.13.0%2B-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md)
 [![License](https://img.shields.io/badge/License-MIT-3DA639?logo=opensourceinitiative&logoColor=white)](LICENSE)
 
 </div>
@@ -29,6 +29,10 @@ Hierarchy Navigator 在每篇笔记的顶部渲染一个导航块，说明这篇
 导航块在渲染时注入到笔记视图，阅读视图与 Live Preview 下表现一致。你的 `.md` 文件不会被改写；插件只在你明确要求新建笔记或文件夹时才写盘。
 
 思路来自思源笔记的 [`hierarchyNavigate`](https://github.com/OpaqueGlass/syplugin-hierarchyNavigate)，并遵循 [AidenLx's Folder Note](https://github.com/aidenlx/alx-folder-note) 的语义实现。
+
+### English description
+
+Hierarchy Navigator renders a parent / siblings / children navigation block at the top of every Obsidian note. It works with Folder Note, uses Obsidian's view registry to filter openable files, and never rewrites note source files. The plugin also provides an optional children index and explicit create actions for empty Folder Notes.
 
 ## Features
 

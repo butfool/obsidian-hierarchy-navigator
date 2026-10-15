@@ -3,7 +3,7 @@
 <h1>Hierarchy Navigator</h1>
 
 <p><strong>A parent / siblings / children navigation block for every Obsidian note</strong></p>
-<p>Requires Obsidian 1.4.0 or later</p>
+<p>Requires Obsidian 1.13.0 or later</p>
 
 <p>
   <a href="README.md">简体中文</a> |
@@ -11,7 +11,7 @@
 </p>
 
 [![Version](https://img.shields.io/badge/Version-0.3.2-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
-[![Obsidian](https://img.shields.io/badge/Obsidian-1.4.0%2B-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md)
+[![Obsidian](https://img.shields.io/badge/Obsidian-1.13.0%2B-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md)
 [![License](https://img.shields.io/badge/License-MIT-3DA639?logo=opensourceinitiative&logoColor=white)](LICENSE)
 
 </div>

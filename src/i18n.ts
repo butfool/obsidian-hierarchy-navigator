@@ -82,7 +82,6 @@ export interface Strings {
 }
 
 export interface SettingsStrings {
-  intro: string;
   languageName: string;
   languageDesc: string;
   headerLabelName: string;
@@ -111,8 +110,6 @@ export interface SettingsStrings {
   enableCreateDesc: string;
   createFolderNoteName: string;
   createFolderNoteDesc: string;
-  tipsHeading: string;
-  tips: string;
 }
 
 /** Dropdown entries for the language setting. Each language names itself. */
@@ -162,9 +159,6 @@ const en: Strings = {
   openFirstChildCommand: "Open the first child file",
 
   settings: {
-    intro:
-      "Display a parent / siblings / children navigation block at the top of " +
-      "any note. Source files are never modified.",
     languageName: "Language",
     languageDesc:
       "Language of this plugin's own interface — the navigation block, the " +
@@ -226,10 +220,6 @@ const en: Strings = {
     createFolderNoteDesc:
       "Default state of the checkbox in the create dialog. Untick it there " +
       "for a single folder without changing this.",
-    tipsHeading: "Tips",
-    tips:
-      "Add `hierarchy-nav: hide` to a note's frontmatter to exclude it from " +
-      "this plugin entirely.",
   },
 };
 
@@ -273,9 +263,6 @@ const zh: Strings = {
   openFirstChildCommand: "打开第一个子文件",
 
   settings: {
-    intro:
-      "在任意笔记顶部显示 父级 / 同级 / 子级 导航区块。" +
-      "永远不会修改源文件。",
     languageName: "语言",
     languageDesc:
       "插件自身界面的语言 —— 导航区块、正文索引和这个设置页。" +
@@ -326,8 +313,6 @@ const zh: Strings = {
     createFolderNoteDesc:
       "弹窗里那个勾选框的默认状态。只想给某一个文件夹跳过时，在弹窗里" +
       "取消勾选即可，不必改这里。",
-    tipsHeading: "提示",
-    tips: "在笔记的 frontmatter 中加入 `hierarchy-nav: hide`，即可让该笔记完全跳过本插件。",
   },
 };
 

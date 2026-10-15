@@ -1,5 +1,10 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
-import type { HierarchyNavigatorPlugin, Locale } from "./types";
+import {
+  App,
+  PluginSettingTab,
+  type SettingDefinition,
+  type SettingDefinitionItem,
+} from "obsidian";
+import type { HierarchyNavigatorPlugin } from "./types";
 import { getStrings, LANGUAGES } from "./i18n";
 
 export class HierarchyNavigatorSettingTab extends PluginSettingTab {
@@ -16,164 +21,167 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
     this.plugin.refresh();
   }
 
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-
-    // Every label on this page comes from the same language table the block
-    // itself uses, so the tab is in whatever language the plugin is set to.
+  getSettingDefinitions(): SettingDefinitionItem[] {
     const t = getStrings(this.plugin.settings.language).settings;
+    const languageOptions = Object.fromEntries(
+      LANGUAGES.map(({ value, label }) => [value, label]),
+    );
+    return [
+      {
+        type: "group",
+        heading: t.sectionsHeading,
+        items: [
+          {
+            name: t.languageName,
+            desc: t.languageDesc,
+            control: {
+              type: "dropdown",
+              key: "language",
+              options: languageOptions,
+              defaultValue: "zh",
+            },
+          },
+          {
+            name: t.headerLabelName,
+            desc: t.headerLabelDesc,
+            control: {
+              type: "text",
+              key: "headerTitle",
+              defaultValue: "Hierarchy",
+            },
+          },
+          this.toggle("showParent", t.showParentName, t.showParentDesc),
+          this.toggle("showSiblings", t.showSiblingsName, t.showSiblingsDesc),
+          this.toggle("showFolders", t.showFoldersName, t.showFoldersDesc),
+          this.toggle("showFiles", t.showFilesName, t.showFilesDesc),
+        ],
+      },
+      {
+        type: "group",
+        heading: t.layoutHeading,
+        items: [
+          {
+            name: t.sectionLayoutName,
+            desc: t.sectionLayoutDesc,
+            control: {
+              type: "dropdown",
+              key: "sectionLayout",
+              options: {
+                "single-line": t.sectionLayoutSingle,
+                wrap: t.sectionLayoutWrap,
+              },
+              defaultValue: "single-line",
+            },
+          },
+          {
+            name: t.maxItemsName,
+            desc: t.maxItemsDesc,
+            control: {
+              type: "number",
+              key: "maxVisibleItems",
+              min: 1,
+              step: 1,
+              defaultValue: 6,
+            },
+          },
+        ],
+      },
+      {
+        type: "group",
+        heading: t.bodyIndexHeading,
+        items: [
+          this.toggle("showBodyIndex", t.showBodyIndexName, t.showBodyIndexDesc),
+        ],
+      },
+      {
+        type: "group",
+        heading: t.createHeading,
+        items: [
+          this.toggle("enableCreate", t.enableCreateName, t.enableCreateDesc),
+          this.toggle(
+            "createFolderNote",
+            t.createFolderNoteName,
+            t.createFolderNoteDesc,
+          ),
+        ],
+      },
+    ];
+  }
 
-    new Setting(containerEl).setName("Hierarchy Navigator").setHeading();
-    containerEl.createEl("p", { text: t.intro });
+  getControlValue(key: string): unknown {
+    switch (key) {
+      case "language":
+        return this.plugin.settings.language;
+      case "headerTitle":
+        return this.plugin.settings.headerTitle;
+      case "showParent":
+      case "showSiblings":
+      case "showFolders":
+      case "showFiles":
+      case "showBodyIndex":
+      case "enableCreate":
+      case "createFolderNote":
+        return this.plugin.settings[key];
+      case "sectionLayout":
+        return this.plugin.settings.sectionLayout;
+      case "maxVisibleItems":
+        return this.plugin.settings.maxVisibleItems;
+      default:
+        return undefined;
+    }
+  }
 
-    // Language first: it is the setting that decides how this very page reads,
-    // so changing it re-renders the tab on the spot.
-    new Setting(containerEl)
-      .setName(t.languageName)
-      .setDesc(t.languageDesc)
-      .addDropdown((d) => {
-        for (const { value, label } of LANGUAGES) d.addOption(value, label);
-        d.setValue(this.plugin.settings.language);
-        d.onChange(async (v) => {
-          this.plugin.settings.language = v as Locale;
-          await this.persist();
-          this.display();
-        });
-      });
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    const languageChanged = key === "language" && value !== this.plugin.settings.language;
+    switch (key) {
+      case "language":
+        if (value === "zh" || value === "en") this.plugin.settings.language = value;
+        break;
+      case "headerTitle":
+        if (typeof value === "string") this.plugin.settings.headerTitle = value.trim();
+        break;
+      case "sectionLayout":
+        if (value === "single-line" || value === "wrap") {
+          this.plugin.settings.sectionLayout = value;
+        }
+        break;
+      case "maxVisibleItems":
+        if (typeof value === "number" && Number.isInteger(value) && value >= 1) {
+          this.plugin.settings.maxVisibleItems = value;
+        }
+        break;
+      case "showParent":
+      case "showSiblings":
+      case "showFolders":
+      case "showFiles":
+      case "showBodyIndex":
+      case "enableCreate":
+      case "createFolderNote":
+        if (typeof value === "boolean") {
+          this.plugin.settings[key] = value;
+        }
+        break;
+    }
+    await this.persist();
+    if (languageChanged) this.update();
+  }
 
-    new Setting(containerEl)
-      .setName(t.headerLabelName)
-      .setDesc(t.headerLabelDesc)
-      .addText((txt) => {
-        txt.setValue(this.plugin.settings.headerTitle);
-        txt.onChange(async (v) => {
-          this.plugin.settings.headerTitle = v.trim();
-          await this.persist();
-        });
-      });
-
-    /* ── Sections ── */
-    new Setting(containerEl).setName(t.sectionsHeading).setHeading();
-
-    new Setting(containerEl)
-      .setName(t.showParentName)
-      .setDesc(t.showParentDesc)
-      .addToggle((tg) => {
-        tg.setValue(this.plugin.settings.showParent);
-        tg.onChange(async (v) => {
-          this.plugin.settings.showParent = v;
-          await this.persist();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName(t.showSiblingsName)
-      .setDesc(t.showSiblingsDesc)
-      .addToggle((tg) => {
-        tg.setValue(this.plugin.settings.showSiblings);
-        tg.onChange(async (v) => {
-          this.plugin.settings.showSiblings = v;
-          await this.persist();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName(t.showFoldersName)
-      .setDesc(t.showFoldersDesc)
-      .addToggle((tg) => {
-        tg.setValue(this.plugin.settings.showFolders);
-        tg.onChange(async (v) => {
-          this.plugin.settings.showFolders = v;
-          await this.persist();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName(t.showFilesName)
-      .setDesc(t.showFilesDesc)
-      .addToggle((tg) => {
-        tg.setValue(this.plugin.settings.showFiles);
-        tg.onChange(async (v) => {
-          this.plugin.settings.showFiles = v;
-          await this.persist();
-        });
-      });
-
-    /* ── Layout ── */
-    new Setting(containerEl).setName(t.layoutHeading).setHeading();
-
-    new Setting(containerEl)
-      .setName(t.sectionLayoutName)
-      .setDesc(t.sectionLayoutDesc)
-      .addDropdown((d) => {
-        d.addOption("single-line", t.sectionLayoutSingle);
-        d.addOption("wrap", t.sectionLayoutWrap);
-        d.setValue(this.plugin.settings.sectionLayout);
-        d.onChange(async (v) => {
-          this.plugin.settings.sectionLayout = v as "single-line" | "wrap";
-          await this.persist();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName(t.maxItemsName)
-      .setDesc(t.maxItemsDesc)
-      .addText((txt) => {
-        txt.inputEl.type = "number";
-        txt.inputEl.min = "1";
-        txt.setValue(String(this.plugin.settings.maxVisibleItems));
-        txt.onChange(async (v) => {
-          const n = Number.parseInt(v, 10);
-          if (!Number.isFinite(n) || n < 1) return;
-          this.plugin.settings.maxVisibleItems = n;
-          await this.persist();
-        });
-      });
-
-    /* ── Body index ── */
-    new Setting(containerEl).setName(t.bodyIndexHeading).setHeading();
-
-    new Setting(containerEl)
-      .setName(t.showBodyIndexName)
-      .setDesc(t.showBodyIndexDesc)
-      .addToggle((tg) => {
-        tg.setValue(this.plugin.settings.showBodyIndex);
-        tg.onChange(async (v) => {
-          this.plugin.settings.showBodyIndex = v;
-          await this.persist();
-        });
-      });
-
-    /* ── Create ──
-       The plugin's only write path, so it gets its own section rather than
-       hiding among the display toggles. */
-    new Setting(containerEl).setName(t.createHeading).setHeading();
-
-    new Setting(containerEl)
-      .setName(t.enableCreateName)
-      .setDesc(t.enableCreateDesc)
-      .addToggle((tg) => {
-        tg.setValue(this.plugin.settings.enableCreate);
-        tg.onChange(async (v) => {
-          this.plugin.settings.enableCreate = v;
-          await this.persist();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName(t.createFolderNoteName)
-      .setDesc(t.createFolderNoteDesc)
-      .addToggle((tg) => {
-        tg.setValue(this.plugin.settings.createFolderNote);
-        tg.onChange(async (v) => {
-          this.plugin.settings.createFolderNote = v;
-          await this.persist();
-        });
-      });
-
-    /* ── Tips ── */
-    new Setting(containerEl).setName(t.tipsHeading).setHeading();
-    containerEl.createEl("p", { text: t.tips });
+  private toggle(
+    key:
+      | "showParent"
+      | "showSiblings"
+      | "showFolders"
+      | "showFiles"
+      | "showBodyIndex"
+      | "enableCreate"
+      | "createFolderNote",
+    name: string,
+    desc: string,
+  ): SettingDefinition {
+    return {
+      name,
+      desc,
+      control: { type: "toggle", key, defaultValue: true },
+    };
   }
 }
