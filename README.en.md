@@ -26,13 +26,13 @@
 
 Hierarchy Navigator renders a navigation block at the top of every note in your vault, telling you where that note sits in the folder tree: which folder holds it, what else lives beside it, and what is inside it. Open any note and you see its parent, its siblings, and its children without switching to the file explorer.
 
-The block is injected at render time and behaves identically in Reading view and Live Preview. Your `.md` files are never rewritten — the plugin writes to disk only when you explicitly ask it to create something.
+The header block is injected at render time in Reading view and Live Preview. The body children index is shown only in Reading view. Your `.md` files are never rewritten — the plugin writes to disk only when you explicitly ask it to create something.
 
-Inspired by SiYuan's [`hierarchyNavigate`](https://github.com/OpaqueGlass/syplugin-hierarchyNavigate) and built on [AidenLX Folder Note](https://github.com/aidenlx/folder-note) semantics.
+Inspired by SiYuan's [`hierarchyNavigate`](https://github.com/OpaqueGlass/syplugin-hierarchyNavigate) and built on [AidenLx's Folder Note](https://github.com/aidenlx/alx-folder-note) semantics.
 
 ## Features
 
-- Renders the same block in Reading view and Live Preview
+- Renders the same header navigation block in Reading view and Live Preview; the body children index appears only in Reading view
 - Works with Folder Note, so a Folder Note navigates as the folder it represents
 - Filters extensions through Obsidian's own view registry, showing only files the app can open
 - Sorts folders before files in natural order, so `9` comes before `10`
@@ -88,7 +88,7 @@ Assign shortcuts under **Settings → Hotkeys**. Command names follow the plugin
 | Command | What it does |
 |---|---|
 | 在文件浏览器中定位父文件夹 | Selects the parent folder in the file explorer |
-| 打开第一个子文件 | Opens the first entry under the current note |
+| 打开第一个子文件 | Opens the first entry under the current Folder Note using the same navigation ordering |
 
 ## Development
 

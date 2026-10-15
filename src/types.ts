@@ -20,7 +20,7 @@ export interface HierarchyNavigatorSettings {
   showFolders: boolean;
   /** Show files in children list. */
   showFiles: boolean;
-  /** Show siblings (same folder as the current file). Includes self. */
+  /** Show siblings (same folder as the current file), excluding the current node. */
   showSiblings: boolean;
   /**
    * Render the Children index block in the note body, below the header
@@ -79,7 +79,7 @@ export const DEFAULT_SETTINGS: HierarchyNavigatorSettings = {
   collapsed: false,
 };
 
-/** Loose typing for the AidenLX Folder Note API surface. */
+/** Loose typing for a Folder Note plugin's optional runtime API surface. */
 export interface FolderNoteAPI {
   fn?: {
     folderMFiles?: Set<string>;

@@ -214,6 +214,7 @@
   border-radius: 999px;
   background: transparent;
   color: var(--hn-text);
+  font-family: inherit;
   text-decoration: none;
   cursor: pointer;
   font-size: 0.95em;

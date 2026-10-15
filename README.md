@@ -28,11 +28,11 @@ Hierarchy Navigator 在每篇笔记的顶部渲染一个导航块，说明这篇
 
 导航块在渲染时注入到笔记视图，阅读视图与 Live Preview 下表现一致。你的 `.md` 文件不会被改写；插件只在你明确要求新建笔记或文件夹时才写盘。
 
-思路来自思源笔记的 [`hierarchyNavigate`](https://github.com/OpaqueGlass/syplugin-hierarchyNavigate)，并遵循 [AidenLX Folder Note](https://github.com/aidenlx/folder-note) 的语义实现。
+思路来自思源笔记的 [`hierarchyNavigate`](https://github.com/OpaqueGlass/syplugin-hierarchyNavigate)，并遵循 [AidenLx's Folder Note](https://github.com/aidenlx/alx-folder-note) 的语义实现。
 
 ## Features
 
-- 阅读视图与 Live Preview 下渲染同一个导航块，两种模式行为一致
+- 阅读视图与 Live Preview 下渲染同一个顶部导航块；正文子项索引只在阅读视图显示
 - 配合 Folder Note 工作，Folder Note 会以它所代表的文件夹参与导航
 - 依据 Obsidian 自己的视图注册表过滤扩展名，只显示能被打开的文件
 - 区块内文件夹排在文件前面，按自然顺序排列，`9` 排在 `10` 之前
@@ -88,7 +88,7 @@ https://github.com/butfool/obsidian-hierarchy-navigator
 | 命令 | 作用 |
 |---|---|
 | 在文件浏览器中定位父文件夹 | 在文件浏览器中选中父级文件夹 |
-| 打开第一个子文件 | 打开当前笔记下的第一个条目 |
+| 打开第一个子文件 | 打开当前 Folder Note 下按导航规则排序后的第一个条目 |
 
 ## Development
 

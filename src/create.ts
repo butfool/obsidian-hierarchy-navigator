@@ -1,4 +1,4 @@
-import type { FileManager, TFile, TFolder } from "obsidian";
+import { TFolder, type FileManager, type TFile } from "obsidian";
 import type HierarchyNavigator from "./main";
 
 /* ────────────────────────────────────────────────
@@ -15,6 +15,8 @@ export interface CreateRequest {
   name: string;
   /** Folder only: also drop `<folder>/<folder>.md` beside it. */
   folderNote: boolean;
+  /** Only retry Folder Note creation for a folder created in this dialog. */
+  retryPartialFolder?: TFolder;
 }
 
 /**
@@ -25,7 +27,12 @@ export interface CreateRequest {
 export type CreateResult =
   | { ok: true; kind: "note"; file: TFile }
   | { ok: true; kind: "folder"; folder: TFolder; folderNote: TFile | null }
-  | { ok: false; reason: "invalid" | "exists" | "failed"; error?: unknown };
+  | {
+      ok: false;
+      reason: "invalid" | "exists" | "failed" | "partial";
+      folder?: TFolder;
+      error?: unknown;
+    };
 
 /** Characters no vault path may hold — the separator included. */
 const INVALID_NAME = /[\\/:*?"<>|]/;
@@ -100,7 +107,25 @@ export async function createChild(
   // (A *folder* of the same name is fine and deliberately allowed — that is
   // exactly the `<folder>/<folder>.md` shape a FolderNote uses.)
   const occupied = request.kind === "note" ? `${path}.md` : path;
-  if (vault.getAbstractFileByPath(occupied)) {
+  const existing = vault.getAbstractFileByPath(occupied);
+  if (existing) {
+    // A previous attempt may have created the folder but failed while adding
+    // its Folder Note. Treat that state as a repair operation instead of
+    // making the user rename an otherwise valid folder.
+    if (
+      request.kind === "folder" &&
+      request.folderNote &&
+      request.retryPartialFolder?.path === existing.path &&
+      existing instanceof TFolder &&
+      !vault.getAbstractFileByPath(`${path}/${name}.md`)
+    ) {
+      try {
+        const folderNote = await createMarkdownFile(plugin, existing, name);
+        return { ok: true, kind: "folder", folder: existing, folderNote };
+      } catch (error) {
+        return { ok: false, reason: "partial", folder: existing, error };
+      }
+    }
     return { ok: false, reason: "exists" };
   }
 
@@ -115,7 +140,11 @@ export async function createChild(
     if (request.folderNote) {
       const notePath = `${path}/${name}.md`;
       if (!vault.getAbstractFileByPath(notePath)) {
-        folderNote = await createMarkdownFile(plugin, folder, name);
+        try {
+          folderNote = await createMarkdownFile(plugin, folder, name);
+        } catch (error) {
+          return { ok: false, reason: "partial", folder, error };
+        }
       }
     }
     return { ok: true, kind: "folder", folder, folderNote };

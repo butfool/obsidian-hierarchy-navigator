@@ -25,7 +25,14 @@ import {
   OWNED_SELECTOR,
   PROPERTIES_SELECTOR,
   destroyOwnedElement,
+  getChildrenForFile,
 } from "./renderer";
+
+interface MountState {
+  frameId: number | null;
+  titleRetryUsed: boolean;
+  disposed: boolean;
+}
 
 export default class HierarchyNavigator
   extends Plugin
@@ -35,6 +42,10 @@ export default class HierarchyNavigator
   /** Command-registry entries, kept so their names can follow the language. */
   private revealParentCommand: Command | null = null;
   private openFirstChildCommand: Command | null = null;
+  private readonly mounts = new Map<MarkdownView, MountState>();
+  private readonly pendingRefreshPaths = new Set<string>();
+  private refreshTimer: number | null = null;
+  private alive = true;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -78,6 +89,37 @@ export default class HierarchyNavigator
 
     this.registerEvent(
       this.app.workspace.on("file-open", () => this.syncActiveLeaf()),
+    );
+
+    this.registerEvent(
+      this.app.vault.on("create", (file) =>
+        this.scheduleRefresh(file.path, this.parentPath(file.path)),
+      ),
+    );
+    this.registerEvent(
+      this.app.vault.on("modify", (file) =>
+        this.scheduleRefresh(file.path, this.parentPath(file.path)),
+      ),
+    );
+    this.registerEvent(
+      this.app.vault.on("delete", (file) =>
+        this.scheduleRefresh(file.path, this.parentPath(file.path)),
+      ),
+    );
+    this.registerEvent(
+      this.app.vault.on("rename", (file, oldPath) =>
+        this.scheduleRefresh(
+          file.path,
+          oldPath,
+          this.parentPath(file.path),
+          this.parentPath(oldPath),
+        ),
+      ),
+    );
+    this.registerEvent(
+      this.app.metadataCache.on("changed", (file) =>
+        this.scheduleRefresh(file.path, this.parentPath(file.path)),
+      ),
     );
 
     // Resizing a pane changes how many pills fit on a line; re-fit rather
@@ -129,7 +171,7 @@ export default class HierarchyNavigator
       checkCallback: (checking) => {
         const file = this.activeFile();
         if (!file || !isEligible(this, file)) return false;
-        const children = (file.parent as unknown as { children?: TFile[] } | null)?.children;
+        const children = getChildrenForFile(this, file);
         if (!children || children.length === 0) return false;
         if (checking) return true;
 
@@ -151,12 +193,17 @@ export default class HierarchyNavigator
   }
 
   onunload(): void {
+    this.alive = false;
+    if (this.refreshTimer !== null) {
+      window.clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+    this.pendingRefreshPaths.clear();
     // Defensive: drop our DOM from any view that still has it, so
     // reloading the plugin doesn't accumulate duplicates if hot-reload
     // doesn't fully reinstantiate Obsidian's view tree.
-    this.iterateMarkdownViews((view) => {
-      this.removeOwned(view.contentEl);
-    });
+    for (const view of this.mounts.keys()) this.disposeMount(view);
+    this.iterateMarkdownViews((view) => this.removeOwned(view.contentEl));
   }
 
   async loadSettings(): Promise<void> {
@@ -204,28 +251,28 @@ export default class HierarchyNavigator
   /**
    * Mount (or refresh) the block in the given leaf's markdown view.
    *
-   * `retried` marks the second attempt of a mount whose view had no title yet:
+   * `titleRetryUsed` marks the second attempt of a mount whose view had no title yet:
    * the title is rendered asynchronously on first open, so the first attempt
    * waits one frame for it, and the second takes the title-less insertion
    * point rather than waiting again. Without that ceiling, a view that never
    * renders a title would rebuild its block once per frame, forever.
    */
-  private mountInto(leaf: WorkspaceLeaf, retried = false): void {
+  private mountInto(leaf: WorkspaceLeaf, existing?: MountState): void {
     const view = leaf.view;
     if (!(view instanceof MarkdownView)) return;
 
     const file = view.file;
     if (!(file instanceof TFile)) return;
 
+    const state = existing ?? this.beginMount(view);
+    if (!this.isCurrentMount(view, state)) return;
+
     // Eligibility check first — if the note opted out, *remove* any
     // stale block from a previous mount.
     if (!isEligible(this, file)) {
-      this.removeOwned(view.contentEl);
+      this.disposeMount(view);
       return;
     }
-
-    // Always start clean: there's at most ONE block per view, period.
-    this.removeOwned(view.contentEl);
 
     const block = renderHierarchyBlock(this, file);
 
@@ -237,16 +284,16 @@ export default class HierarchyNavigator
     // Returns false only when nothing was placed because the title has not
     // rendered yet; the caller then retries on the next frame.
     const placeChrome = (): boolean => {
-      const title = view.contentEl.querySelector<HTMLElement>(
-        ".inline-title, :scope h1",
-      );
+      const title = Array.from(
+        view.contentEl.querySelectorAll<HTMLElement>(".inline-title, :scope h1"),
+      ).find((node) => !node.closest(".markdown-embed, .internal-embed"));
       if (title) {
         // Properties sit in the document flow in both reading and editing
         // (Live Preview / Source) views: place the block just above them,
         // which keeps the order title → navigation → properties → body.
-        const metadata = view.contentEl.querySelector<HTMLElement>(
-          ".metadata-container, .metadata-properties",
-        );
+        const metadata = Array.from(
+          view.contentEl.querySelectorAll<HTMLElement>(PROPERTIES_SELECTOR),
+        ).find((node) => !node.closest(".markdown-embed, .internal-embed"));
         const metadataParent = metadata?.parentElement;
         if (metadata && metadataParent) {
           metadataParent.insertBefore(block, metadata);
@@ -281,10 +328,12 @@ export default class HierarchyNavigator
 
       // The title is rendered asynchronously on first open. Give Obsidian one
       // frame to add it before choosing a fallback insertion point.
-      if (!retried) {
-        window.requestAnimationFrame(() => {
-          if (view.file === file) {
-            this.mountInto(leaf, true);
+      if (!state.titleRetryUsed) {
+        state.titleRetryUsed = true;
+        state.frameId = window.requestAnimationFrame(() => {
+          state.frameId = null;
+          if (view.file === file && this.isCurrentMount(view, state)) {
+            this.mountInto(leaf, state);
           }
         });
         return false;
@@ -315,11 +364,16 @@ export default class HierarchyNavigator
       return true;
     };
 
-    if (!placeChrome()) return;
+    if (!placeChrome()) {
+      // The block already owns document-level listeners even though it has
+      // not been inserted. Release them before the title retry.
+      destroyOwnedElement(block);
+      return;
+    }
 
     // The index is a node in the note, placed directly under the header rail
     // by `attachBodyIndex`: it scrolls with the text like any other block.
-    this.mountBodyIndex(view, file);
+    this.mountBodyIndex(view, file, state);
   }
 
   /* ────────────────────────────────────────────────
@@ -331,7 +385,7 @@ export default class HierarchyNavigator
    * launcher for a page that has nothing on it yet, and on a note that already
    * has a body it would only be one more thing to scroll past.
    */
-  private mountBodyIndex(view: MarkdownView, file: TFile): void {
+  private mountBodyIndex(view: MarkdownView, file: TFile, state: MountState): void {
     // Reading mode only. A launcher is for a page you are *looking* at: in the
     // editor it would sit between you and the text you are writing, so editing
     // mode simply never gets one.
@@ -347,9 +401,13 @@ export default class HierarchyNavigator
     // rather than guessing: a wrong "empty" drops a panel over real writing,
     // and a wrong "not empty" silently loses the launcher on a blank page.
     void this.app.vault.cachedRead(file).then((text) => {
-      if (view.file !== file) return;
+      if (!this.isCurrentMount(view, state)) return;
+      if (view.file !== file || view.getMode() !== "preview") return;
       if (!isRawBodyEmpty(text)) return;
       this.attachBodyIndex(view, file);
+    }).catch(() => {
+      // A cache read can fail while a file is being renamed or deleted. The
+      // navigation block remains useful, but there is no safe index to add.
     });
   }
 
@@ -362,6 +420,11 @@ export default class HierarchyNavigator
    * body: there is nothing below it to displace.
    */
   private attachBodyIndex(view: MarkdownView, file: TFile): void {
+    if (view.getMode() !== "preview") return;
+    view.contentEl.querySelectorAll<HTMLElement>(`.${INDEX_CLASS}`).forEach((node) => {
+      destroyOwnedElement(node);
+      node.remove();
+    });
     const index = renderBodyIndex(this, file);
     if (!index) return;
 
@@ -395,7 +458,10 @@ export default class HierarchyNavigator
     // Obsidian renders both in the same reading column.
     const own = Array.from(
       host.querySelectorAll<HTMLElement>(PROPERTIES_SELECTOR),
-    ).find((node) => node.parentElement === rail?.parentElement);
+    ).find((node) =>
+      node.parentElement === rail?.parentElement &&
+      !node.closest(".markdown-embed, .internal-embed"),
+    );
     return own ?? rail;
   }
 
@@ -409,7 +475,14 @@ export default class HierarchyNavigator
 
   /** Walk every markdown leaf and (re-)mount if it's a preview leaf. */
   private syncAllOpenLeaves(): void {
-    this.iterateMarkdownViews((view) => this.mountInto(view.leaf));
+    const openViews = new Set<MarkdownView>();
+    this.iterateMarkdownViews((view) => {
+      openViews.add(view);
+      this.mountInto(view.leaf);
+    });
+    for (const view of this.mounts.keys()) {
+      if (!openViews.has(view)) this.disposeMount(view);
+    }
   }
 
   /** Refresh the active leaf — used when settings change in-flight. */
@@ -423,5 +496,66 @@ export default class HierarchyNavigator
       const view = leaf.view;
       if (view instanceof MarkdownView) fn(view);
     });
+  }
+
+  private beginMount(view: MarkdownView): MountState {
+    this.disposeMount(view);
+    const state: MountState = {
+      frameId: null,
+      titleRetryUsed: false,
+      disposed: false,
+    };
+    this.mounts.set(view, state);
+    return state;
+  }
+
+  private isCurrentMount(view: MarkdownView, state: MountState): boolean {
+    return this.alive && !state.disposed && this.mounts.get(view) === state;
+  }
+
+  private disposeMount(view: MarkdownView): void {
+    const state = this.mounts.get(view);
+    if (state) {
+      state.disposed = true;
+      if (state.frameId !== null) window.cancelAnimationFrame(state.frameId);
+      state.frameId = null;
+      this.mounts.delete(view);
+    }
+    this.removeOwned(view.contentEl);
+  }
+
+  private scheduleRefresh(...paths: string[]): void {
+    if (!this.alive) return;
+    paths.forEach((path) => this.pendingRefreshPaths.add(path));
+    if (this.refreshTimer !== null) return;
+    this.refreshTimer = window.setTimeout(() => {
+      this.refreshTimer = null;
+      const changedPaths = new Set(this.pendingRefreshPaths);
+      this.pendingRefreshPaths.clear();
+      this.syncAffectedLeaves(changedPaths);
+    }, 50);
+  }
+
+  private syncAffectedLeaves(changedPaths: ReadonlySet<string>): void {
+    const openViews = new Set<MarkdownView>();
+    this.iterateMarkdownViews((view) => {
+      openViews.add(view);
+      const file = view.file;
+      if (!(file instanceof TFile)) return;
+      if (
+        changedPaths.has(file.path) ||
+        (file.parent && changedPaths.has(file.parent.path))
+      ) {
+        this.mountInto(view.leaf);
+      }
+    });
+    for (const view of this.mounts.keys()) {
+      if (!openViews.has(view)) this.disposeMount(view);
+    }
+  }
+
+  private parentPath(path: string): string {
+    const separator = path.lastIndexOf("/");
+    return separator <= 0 ? "/" : path.slice(0, separator);
   }
 }

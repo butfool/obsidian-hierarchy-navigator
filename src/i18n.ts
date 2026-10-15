@@ -66,6 +66,8 @@ export interface Strings {
   createExists: string;
   /** Inline error for anything the vault itself refused. */
   createFailed: (message: string) => string;
+  /** The folder exists, but its requested Folder Note could not be created. */
+  createPartial: (message: string) => string;
   /** Notice after a note was created. */
   createdNote: (name: string) => string;
   /** Notice after a folder was created. */
@@ -151,6 +153,8 @@ const en: Strings = {
   createInvalidName: 'A name is required, without \\ / : * ? " < > | in it',
   createExists: "A note or folder with that name is already here",
   createFailed: (message) => `Could not create it: ${message}`,
+  createPartial: (message) =>
+    `The folder was created, but its FolderNote could not be created: ${message}`,
   createdNote: (name) => `Created “${name}”`,
   createdFolder: (name) => `Created folder “${name}”`,
 
@@ -260,6 +264,8 @@ const zh: Strings = {
   createInvalidName: "需要填写名称，且不能包含 \\ / : * ? \" < > |",
   createExists: "同名笔记或文件夹已存在",
   createFailed: (message) => `创建失败：${message}`,
+  createPartial: (message) =>
+    `文件夹已创建，但 FolderNote 创建失败：${message}`,
   createdNote: (name) => `已新建「${name}」`,
   createdFolder: (name) => `已新建文件夹「${name}」`,
 

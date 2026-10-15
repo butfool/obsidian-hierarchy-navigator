@@ -153,6 +153,8 @@ function collectLogicalChildren(
  * the vault's own ordering is never trusted — it interleaves folders and
  * files by name, which buries the folders you navigate by.
  */
+export type Entry = TFile | TFolder;
+
 function compareEntries(a: Entry, b: Entry): number {
   const aIsFolder = a instanceof TFolder;
   const bIsFolder = b instanceof TFolder;
@@ -161,6 +163,38 @@ function compareEntries(a: Entry, b: Entry): number {
     numeric: true,
     sensitivity: "base",
   });
+}
+
+/**
+ * Return the same filtered and sorted entries used by every navigation
+ * surface. Keeping this in one place prevents commands and rendered lists
+ * from drifting apart.
+ */
+export function getVisibleChildren(
+  plugin: HierarchyNavigator,
+  folder: TFolder,
+  excludePaths: ReadonlySet<string> = new Set(),
+): Entry[] {
+  const collected: Entry[] = [];
+  collectLogicalChildren(plugin, folder, collected);
+  return collected
+    .filter((entry) => {
+      if (excludePaths.has(entry.path)) return false;
+      return entry instanceof TFolder
+        ? plugin.settings.showFolders
+        : plugin.settings.showFiles;
+    })
+    .sort(compareEntries);
+}
+
+/** Children of the folder represented by a Folder Note, if any. */
+export function getChildrenForFile(
+  plugin: HierarchyNavigator,
+  file: TFile,
+): Entry[] {
+  const folder = logicalFolderForFile(plugin, file);
+  if (!(folder instanceof TFolder)) return [];
+  return getVisibleChildren(plugin, folder, new Set([file.path]));
 }
 
 /* ────────────────────────────────────────────────
@@ -209,8 +243,6 @@ function openTarget(
 /* ────────────────────────────────────────────────
    Single-line inline layout
    ──────────────────────────────────────────────── */
-
-type Entry = TFile | TFolder;
 
 interface Segment {
   /** Single-line label for the column header — e.g. "Parent". */
@@ -272,9 +304,11 @@ function makePill(
   const typeMod = it.kind === "file" && it.ext !== undefined
     ? ` ${fileTypeClass(it.ext)}`
     : "";
-  const pill = el("a", {
+  const pill = el(it.target instanceof TFile ? "a" : "button", {
     cls: `hn-pill hn-kind-${it.kind}${typeMod}`,
-    attr: { "data-href": it.target.path },
+    attr: it.target instanceof TFile
+      ? { href: it.target.path, "data-href": it.target.path }
+      : { type: "button", "data-href": it.target.path },
   });
   pill.appendChild(
     it.kind === "folder-note"
@@ -309,10 +343,8 @@ function makePill(
 interface OverflowPanel {
   /** The `<details>` element — chip plus panel. */
   root: HTMLElement;
-  /** Container holding the pills that did not fit. */
-  menu: HTMLElement;
-  /** Hand the panel exactly these pills (hides it when there are none). */
-  setPills(pills: HTMLElement[]): void;
+  /** Hand the panel exactly these items; their DOM is created on open. */
+  setItems(items: Segment["items"]): void;
   /** Dismiss it if it is open. */
   close(): void;
 }
@@ -327,6 +359,7 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
   const menu = el("div", { cls: "hn-more-menu" });
   more.appendChild(menu);
 
+  let overflowItems: Segment["items"] = [];
   let openTimer = 0;
   let closeTimer = 0;
   let hideTimer = 0;
@@ -335,11 +368,22 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
   let dismissedByClick = false;
 
   const isOpen = () => more.classList.contains("hn-open");
+  const renderItems = () => {
+    if (menu.childElementCount > 0 || overflowItems.length === 0) return;
+    menu.replaceChildren(
+      ...overflowItems.map((item, index) => {
+        const pill = makePill(plugin, item);
+        pill.style.setProperty("--hn-i", String(Math.min(index, 6)));
+        return pill;
+      }),
+    );
+  };
   const open = () => {
     if (isOpen()) return;
     window.clearTimeout(hideTimer);
     window.clearTimeout(closeTimer);
     more.open = true;
+    renderItems();
     // Flush the freshly shown panel so the transition has a "from" state.
     void menu.offsetHeight;
     // Hand the bridge (styles.css) the panel's real width so the pointer can
@@ -414,23 +458,19 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
 
   return {
     root: more,
-    menu,
     close,
-    setPills(pills) {
-      pills.forEach((pill, i) => {
-        // Index drives the cascade in styles.css; cap it so a long list
-        // still settles quickly instead of trickling in.
-        pill.style.setProperty("--hn-i", String(Math.min(i, 6)));
-      });
-      menu.replaceChildren(...pills);
-      chip.textContent = `+${pills.length}`;
+    setItems(items) {
+      overflowItems = items;
+      menu.replaceChildren();
+      if (isOpen()) renderItems();
+      chip.textContent = `+${items.length}`;
       chip.setAttribute(
         "title",
-        getStrings(plugin.settings.language).overflowChip(pills.length),
+        getStrings(plugin.settings.language).overflowChip(items.length),
       );
       // Nothing left over: the chip takes no room at all.
-      more.style.display = pills.length > 0 ? "" : "none";
-      if (pills.length === 0) close();
+      more.style.display = items.length > 0 ? "" : "none";
+      if (items.length === 0) close();
     },
   };
 }
@@ -485,7 +525,8 @@ function buildSegment(
     1,
     Math.floor(plugin.settings.maxVisibleItems) || 1,
   );
-  const pills = seg.items.map((it) => makePill(plugin, it));
+  const visibleItems = seg.items.slice(0, cap);
+  const pills = visibleItems.map((it) => makePill(plugin, it));
   const list = el("div", { cls: "hn-pills" });
   body.appendChild(list);
   const panel = makeOverflowMenu(plugin);
@@ -496,13 +537,14 @@ function buildSegment(
 
   /** Show the first `visible` pills in the row, the rest in the panel. */
   const apply = (visible: number) => {
-    const overflow: HTMLElement[] = [];
-    pills.forEach((pill, i) => {
-      const target = i < visible ? list : panel.menu;
-      if (i >= visible) overflow.push(pill);
-      if (pill.parentElement !== target) target.appendChild(pill);
+    pills.forEach((pill, index) => {
+      if (index < visible) {
+        if (pill.parentElement !== list) list.appendChild(pill);
+      } else {
+        pill.remove();
+      }
     });
-    panel.setPills(overflow);
+    panel.setItems(seg.items.slice(visible));
     // Re-append last: moving pills in and out of the row must never leave
     // the chip ahead of them.
     chipHome.appendChild(panel.root);
@@ -511,7 +553,7 @@ function buildSegment(
   const initial = Math.min(cap, pills.length);
   apply(initial);
 
-  if (!wrap && pills.length > initial) {
+  if (!wrap && pills.length > 0) {
     // A single clipped line: measure how many pills really fit and hand the
     // rest to the panel, so nothing is ever half-hidden behind the edge.
     const fit = () => {
@@ -528,7 +570,17 @@ function buildSegment(
             break;
           }
         }
-        if (over === visible) return; // the whole row fits
+        if (over === visible) {
+          if (visible < pills.length) {
+            const chipWidth = panel.root.getBoundingClientRect().width;
+            if (list.getBoundingClientRect().right + chipWidth >
+                body.getBoundingClientRect().right + 0.5) {
+              visible -= 1;
+              continue;
+            }
+          }
+          return; // the whole row fits
+        }
         // `over` can be 0: in a pane too narrow for even one pill, showing
         // a clipped pill would be worse than showing none — the panel then
         // holds the whole section.
@@ -595,18 +647,9 @@ export function renderHierarchyBlock(
     // that is the folder's own parent, otherwise the file's parent folder.
     const siblingFolder = logicalFolder?.parent ?? file.parent;
     const mePath = logicalFolder?.path ?? file.path;
-    const collectedSiblings: Entry[] = [];
-    if (siblingFolder instanceof TFolder) {
-      collectLogicalChildren(plugin, siblingFolder, collectedSiblings);
-    }
-    const filtered = collectedSiblings.filter((c) => {
-      // The current node is where you already are, so it is never listed:
-      // that is the file itself for a plain note, and the folder a Folder
-      // Note stands for otherwise.
-      if (c.path === mePath || c.path === file.path) return false;
-      return c instanceof TFolder ? settings.showFolders : settings.showFiles;
-    });
-    filtered.sort(compareEntries);
+    const filtered = siblingFolder instanceof TFolder
+      ? getVisibleChildren(plugin, siblingFolder, new Set([mePath, file.path]))
+      : [];
     // Nothing beside this note: the row goes away instead of standing there
     // empty. That is the common case for a lone note in a folder.
     if (filtered.length > 0) {
@@ -625,13 +668,7 @@ export function renderHierarchyBlock(
     // Only a Folder Note stands for a folder, and only then is there contents
     // to navigate into.
     if (!(logicalFolder instanceof TFolder)) return null;
-    const collected: Entry[] = [];
-    collectLogicalChildren(plugin, logicalFolder, collected);
-    const filtered = collected.filter((entry) => {
-      if (entry.path === file.path) return false;
-      return entry instanceof TFolder ? settings.showFolders : settings.showFiles;
-    });
-    filtered.sort(compareEntries);
+    const filtered = getChildrenForFile(plugin, file);
     // An empty folder, or a folder whose contents are all filtered out, has
     // no Children row — same rule as everywhere else.
     if (filtered.length === 0) return null;
@@ -772,8 +809,13 @@ export const OWNED_SELECTOR = `.${BLOCK_CLASS}, .${INDEX_CLASS}`;
  */
 export const PROPERTIES_SELECTOR = ".metadata-container, .metadata-properties";
 
-/** Frontmatter block at the very start of a note, for the raw-text fallback. */
-const FRONTMATTER_RE = /^\uFEFF?---\r?\n[\s\S]*?\r?\n---\r?\n?/;
+/** Remove a frontmatter block without treating YAML contents as a regex. */
+function removeFrontmatter(text: string): string {
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
+  if (lines[0]?.trim() !== "---") return text;
+  const closing = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
+  return closing < 0 ? text : lines.slice(closing + 1).join("\n");
+}
 
 /**
  * Coarse relative time — "just now" / "3 hours ago", falling back to a
@@ -817,7 +859,7 @@ export function isNoteBodyEmpty(
 
 /** The same question answered from raw text, for files with no cache yet. */
 export function isRawBodyEmpty(text: string): boolean {
-  return text.replace(FRONTMATTER_RE, "").trim() === "";
+  return removeFrontmatter(text).trim() === "";
 }
 
 /**
@@ -873,16 +915,7 @@ export function renderBodyIndex(
   const folder = logicalFolderForFile(plugin, file);
   if (!(folder instanceof TFolder) || folder.path === ROOT) return null;
 
-  const collected: Entry[] = [];
-  collectLogicalChildren(plugin, folder, collected);
-  const items = collected
-    .filter((entry) => {
-      if (entry.path === file.path) return false;
-      return entry instanceof TFolder
-        ? plugin.settings.showFolders
-        : plugin.settings.showFiles;
-    })
-    .sort(compareEntries);
+  const items = getChildrenForFile(plugin, file);
   // An empty folder still has one reason to show this panel: its create
   // button. That is the page where you most want to add the first thing — so
   // with create switched off we keep the old behaviour and draw nothing.

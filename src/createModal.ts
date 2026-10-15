@@ -14,6 +14,7 @@ import { createChild, type CreateKind } from "./create";
 export class CreateChildModal extends Modal {
   private kind: CreateKind = "note";
   private name = "";
+  private partialFolder: TFolder | null = null;
   private folderNote: boolean;
   private nameInput: HTMLInputElement | null = null;
   private folderNoteSetting: Setting | null = null;
@@ -54,6 +55,7 @@ export class CreateChildModal extends Modal {
         text.setPlaceholder(t.createNamePlaceholder);
         text.onChange((value) => {
           this.name = value;
+          this.partialFolder = null;
           this.clearError();
           this.syncKind();
         });
@@ -133,6 +135,7 @@ export class CreateChildModal extends Modal {
       kind: this.kind,
       name: this.name,
       folderNote: this.folderNote,
+      retryPartialFolder: this.partialFolder ?? undefined,
     });
 
     if (result.ok) {
@@ -154,7 +157,11 @@ export class CreateChildModal extends Modal {
     this.setBusy(false);
     if (result.reason === "exists") this.showError(t.createExists);
     else if (result.reason === "invalid") this.showError(t.createInvalidName);
-    else this.showError(t.createFailed(describe(result.error)));
+    else if (result.reason === "partial") {
+      this.partialFolder = result.folder ?? null;
+      this.plugin.refresh();
+      this.showError(t.createPartial(describe(result.error)));
+    } else this.showError(t.createFailed(describe(result.error)));
     this.nameInput?.focus();
   }
 }

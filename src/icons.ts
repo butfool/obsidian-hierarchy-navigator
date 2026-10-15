@@ -5,8 +5,11 @@
  */
 
 const NS = "http://www.w3.org/2000/svg";
+const iconTemplates = new Map<string, SVGElement>();
 
 function wrap(paths: string): SVGElement {
+  const cached = iconTemplates.get(paths);
+  if (cached) return cached.cloneNode(true) as SVGElement;
   const parsed = new DOMParser().parseFromString(
     `<svg xmlns="${NS}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`,
     "image/svg+xml",
@@ -14,7 +17,9 @@ function wrap(paths: string): SVGElement {
   if (parsed.documentElement.localName !== "svg") {
     throw new Error("Failed to parse an internal SVG icon");
   }
-  return document.importNode(parsed.documentElement, true) as unknown as SVGElement;
+  const template = document.importNode(parsed.documentElement, true) as unknown as SVGElement;
+  iconTemplates.set(paths, template);
+  return template.cloneNode(true) as SVGElement;
 }
 
 export const Icons = {
@@ -257,7 +262,9 @@ const TYPE_ICONS: Record<FileTypeKey, () => SVGElement> = {
 /** Map a file extension (with or without a leading dot) to its family. */
 export function fileTypeKey(extension: string): FileTypeKey {
   const ext = extension.replace(/^\./, "").toLowerCase();
-  return EXTENSION_TYPES[ext] ?? "file";
+  return Object.prototype.hasOwnProperty.call(EXTENSION_TYPES, ext)
+    ? EXTENSION_TYPES[ext]
+    : "file";
 }
 
 /** Icon for a file extension. */
