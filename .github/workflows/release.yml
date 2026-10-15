@@ -55,6 +55,20 @@ jobs:
           test -s manifest.json
           test -s styles.css
 
+      - name: Package manual installation ZIP
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          package_dir="$RUNNER_TEMP/plugin-package"
+          mkdir -p "$package_dir/hierarchy-navigator"
+          cp main.js manifest.json styles.css "$package_dir/hierarchy-navigator/"
+          cd "$package_dir"
+          zip -X "$GITHUB_WORKSPACE/hierarchy-navigator-${RELEASE_TAG}.zip" \
+            hierarchy-navigator/main.js \
+            hierarchy-navigator/manifest.json \
+            hierarchy-navigator/styles.css
+          unzip -t "$GITHUB_WORKSPACE/hierarchy-navigator-${RELEASE_TAG}.zip"
+
       - name: Attest release assets
         uses: actions/attest@v4
         with:
@@ -62,6 +76,7 @@ jobs:
             main.js
             manifest.json
             styles.css
+            hierarchy-navigator-*.zip
 
       - name: Create draft release
         env:
@@ -74,4 +89,4 @@ jobs:
             --title "Hierarchy Navigator $RELEASE_TAG" \
             --generate-notes \
             --draft \
-            main.js manifest.json styles.css
+            main.js manifest.json styles.css "hierarchy-navigator-${RELEASE_TAG}.zip"

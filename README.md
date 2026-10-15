@@ -52,11 +52,11 @@ Hierarchy Navigator renders a parent / siblings / children navigation block at t
 
 ### 手动安装
 
-1. 打开 [Releases](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)，下载同一版本的 `main.js`、`manifest.json` 和 `styles.css` 附件，不要使用 Source code 压缩包代替。
-2. 将三个文件放到 `YOUR_VAULT/.obsidian/plugins/hierarchy-navigator/`。
+1. 打开 [Releases](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)，下载 `hierarchy-navigator-x.y.z.zip` 安装包（例如 `hierarchy-navigator-0.3.3.zip`），不要下载 Source code 压缩包。
+2. 解压后，将整个 `hierarchy-navigator` 文件夹放到 `YOUR_VAULT/.obsidian/plugins/` 下。
 3. 在 **Settings → Community plugins → Installed plugins** 中启用 **Hierarchy Navigator**。
 
-安装目录使用 manifest 中的 ID：`hierarchy-navigator`。普通用户无需安装 Node.js 或自行构建。
+也可以单独下载同一版本的 `main.js`、`manifest.json` 和 `styles.css`，放到 `YOUR_VAULT/.obsidian/plugins/hierarchy-navigator/`。安装 ZIP 内包含相同的三个文件；社区插件安装器仍使用三个独立附件。普通用户无需安装 Node.js 或自行构建。
 
 ### BRAT 预览版
 
@@ -108,7 +108,7 @@ npm run dev      # 监听 src/ 目录，每次改动重新构建 main.js
 
 ## Releasing
 
-发布工作流位于 `.github/workflows/release.yml`。它只构建标签对应的已提交代码，使用锁文件安装依赖，校验标签与版本一致，并为三个附件生成构建来源证明。
+发布工作流位于 `.github/workflows/release.yml`。它只构建标签对应的已提交代码，使用锁文件安装依赖，校验标签与版本一致，额外打包带 `hierarchy-navigator/` 目录的安装 ZIP，并为三个标准附件和 ZIP 生成构建来源证明。
 
 1. 将 `manifest.json`、`package.json` 和 `package-lock.json` 中的版本统一为新的 `x.y.z`，同步 README 版本徽章。若提高 `minAppVersion`，按需维护 `versions.json` 中的旧版本映射。
 2. 完成验证并提交、推送本次发布的全部目标改动。不要从含未提交源码的工作区构建发布附件。
@@ -119,7 +119,7 @@ git tag -a 0.3.3 -m "0.3.3"
 git push origin 0.3.3
 ```
 
-4. 等待 **Actions → Release Obsidian plugin** 成功。它会创建草稿 Release，并上传 `main.js`、`manifest.json`、`styles.css`。
+4. 等待 **Actions → Release Obsidian plugin** 成功。它会创建草稿 Release，并上传 `main.js`、`manifest.json`、`styles.css` 和 `hierarchy-navigator-x.y.z.zip`。
 5. 核对附件和发布说明，然后选择 **Publish release**。草稿尚不能作为公开安装来源。
 
 上面的 `0.3.3` 仅为下一版本示例，必须替换成 manifest 中的实际版本。首次进入官方社区目录仍需单独在 [community.obsidian.md](https://community.obsidian.md/) 提交，创建 GitHub Release 不等于已经上架。

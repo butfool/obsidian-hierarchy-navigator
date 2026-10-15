@@ -48,11 +48,11 @@ The plugin is not on the community plugin store yet. Install it manually or thro
 
 ### Manual install
 
-1. Open [Releases](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest) and download the `main.js`, `manifest.json`, and `styles.css` attachments from the same release. The Source code archives are not installable plugin packages.
-2. Place all three files in `YOUR_VAULT/.obsidian/plugins/hierarchy-navigator/`.
+1. Open [Releases](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest) and download `hierarchy-navigator-x.y.z.zip` (for example, `hierarchy-navigator-0.3.3.zip`). Do not download the Source code archives.
+2. Extract the ZIP and place the entire `hierarchy-navigator` folder in `YOUR_VAULT/.obsidian/plugins/`.
 3. Enable **Hierarchy Navigator** under **Settings → Community plugins → Installed plugins**.
 
-Use the manifest ID, `hierarchy-navigator`, as the installation directory name. Users do not need Node.js or a local build.
+Alternatively, download `main.js`, `manifest.json`, and `styles.css` from the same release and place them in `YOUR_VAULT/.obsidian/plugins/hierarchy-navigator/`. The installation ZIP contains the same three files; the community plugin installer still uses the individual assets. Users do not need Node.js or a local build.
 
 ### BRAT preview
 
@@ -104,7 +104,7 @@ Keep the repository at `YOUR_VAULT/.obsidian/plugins/hierarchy-navigator/` while
 
 ## Releasing
 
-The `.github/workflows/release.yml` workflow builds only the committed source at the pushed tag. It installs locked dependencies, validates the version, and generates build provenance attestations for all three assets.
+The `.github/workflows/release.yml` workflow builds only the committed source at the pushed tag. It installs locked dependencies, validates the version, packages an installation ZIP containing the `hierarchy-navigator/` directory, and generates build provenance attestations for the three standard assets and the ZIP.
 
 1. Set the same new `x.y.z` version in `manifest.json`, `package.json`, and `package-lock.json`, and update the README version badges. If `minAppVersion` increases, maintain older-version mappings in `versions.json` as needed.
 2. Verify, commit, and push all intended release changes. Never upload a build containing uncommitted source.
@@ -115,7 +115,7 @@ git tag -a 0.3.3 -m "0.3.3"
 git push origin 0.3.3
 ```
 
-4. Wait for **Actions → Release Obsidian plugin** to succeed. It creates a draft release with `main.js`, `manifest.json`, and `styles.css` attached.
+4. Wait for **Actions → Release Obsidian plugin** to succeed. It creates a draft release with `main.js`, `manifest.json`, `styles.css`, and `hierarchy-navigator-x.y.z.zip` attached.
 5. Check the assets and release notes, then select **Publish release**. Draft releases are not public installation sources.
 
 The `0.3.3` tag above is only a next-version example; replace it with the actual manifest version. Initial inclusion in the official community directory requires a separate submission at [community.obsidian.md](https://community.obsidian.md/). A GitHub release alone does not list the plugin there.
