@@ -1,375 +1,114 @@
-import { TFile, TFolder, TAbstractFile } from "obsidian";
-import type {
-  AnyApp,
-  FolderNoteAPI,
-  HomepagePluginAPI,
-} from "./types";
+import { TFile, TFolder } from "obsidian";
 import type HierarchyNavigator from "./main";
 import { Icons, fileTypeIcon, fileTypeClass } from "./icons";
-import { getStrings, type Strings } from "./i18n";
-import { promptCreateChild } from "./createModal";
+import { getStrings } from "./i18n";
+import { el } from "./ui/dom";
+import { openTarget } from "./ui/navigation";
+import type { Entry } from "./hierarchy";
+import {
+  findFolderNoteFile,
+  getChildrenForFile,
+  getParentTarget,
+  getVisibleChildren,
+  logicalFolderForFile,
+} from "./hierarchy";
 
-const ROOT = "/";
-const FOLDER_NOTE_SUFFIX = ".md";
-
-/** Exported so `main.ts` can query / remove our nodes by selector. */
 export const BLOCK_CLASS = "hn-root";
+export const INDEX_CLASS = "hn-index";
+export const OWNED_SELECTOR = `.${BLOCK_CLASS}, .${INDEX_CLASS}`;
+export const PROPERTIES_SELECTOR = ".metadata-container, .metadata-properties";
 
-/** Duration of the fold/unfold animation — keep in sync with styles.css. */
 const FOLD_MS = 180;
-
-/** Duration of the "+N" dropdown open/close animation — keep in sync with styles.css. */
 const MENU_MS = 140;
-/** The dropdown opens shortly after the pointer arrives... */
 const MENU_HOVER_OPEN_MS = 60;
-/** ...and slips away once it leaves. The CSS bridge already spans the gap
- * between chip and panel; this grace only absorbs odd paths across the edge. */
 const MENU_HOVER_CLOSE_MS = 240;
 
-/* ────────────────────────────────────────────────
-   Detection helpers
-   ──────────────────────────────────────────────── */
-
-function isFolderNote(
-  plugin: HierarchyNavigator,
-  file: TFile,
-): boolean {
-  const api = (plugin.app as AnyApp).plugins?.plugins?.["folder-note"] as
-    | FolderNoteAPI
-    | undefined;
-  const folderSet = api?.fn?.folderMFiles;
-  if (folderSet && typeof folderSet.has === "function") {
-    return folderSet.has(file.path);
-  }
-  const parent = file.parent;
-  if (!parent) return false;
-  return parent.name === file.basename;
+interface SegmentItem {
+  target: TFile | TFolder;
+  name: string;
+  kind: "file" | "dir" | "folder-note" | "home";
+  ext?: string;
 }
-
-function isHiddenByFrontmatter(
-  plugin: HierarchyNavigator,
-  file: TFile,
-): boolean {
-  const cache = plugin.app.metadataCache.getFileCache(file);
-  if (!cache?.frontmatter) return false;
-  const fm = cache.frontmatter;
-  if (fm["hierarchy-nav"] === "hide") return true;
-  if (fm["hierarchy_nav"] === "hide") return true;
-  if (fm["hn-hide"] === true || fm["hn-hide"] === "true") return true;
-  return false;
-}
-
-function findFolderNoteFile(
-  plugin: HierarchyNavigator,
-  folder: TFolder,
-): TFile | null {
-  const candidate = `${folder.path}/${folder.name}${FOLDER_NOTE_SUFFIX}`;
-  const af: TAbstractFile | null =
-    plugin.app.vault.getAbstractFileByPath(candidate);
-  return af instanceof TFile ? af : null;
-}
-
-/** Fallback used only if the internal view registry is unavailable. */
-const FALLBACK_SUPPORTED_EXTENSIONS = new Set([
-  "md", "canvas", "base", "pdf",
-  "png", "jpg", "jpeg", "gif", "bmp", "svg", "webp", "avif",
-  "mp3", "wav", "m4a", "ogg", "3gp", "flac",
-  "mp4", "webm", "ogv", "mov", "mkv",
-]);
-
-/**
- * Only list files Obsidian can actually open. The view registry holds the
- * live extension → view-type map that Obsidian itself consults when opening
- * a file, so unsupported formats (scripts, .DS_Store, …) drop out.
- */
-function isSupportedByObsidian(
-  plugin: HierarchyNavigator,
-  file: TFile,
-): boolean {
-  const registry = (plugin.app as unknown as {
-    viewRegistry?: {
-      getTypeByExtension?: (extension: string) => string | null | undefined;
-    };
-  }).viewRegistry;
-  const getTypeByExtension = registry?.getTypeByExtension;
-  if (typeof getTypeByExtension === "function") {
-    return Boolean(getTypeByExtension.call(registry, file.extension.toLowerCase()));
-  }
-  return FALLBACK_SUPPORTED_EXTENSIONS.has(file.extension.toLowerCase());
-}
-
-function logicalFolderForFile(
-  plugin: HierarchyNavigator,
-  file: TFile,
-): TFolder | null {
-  if (!isFolderNote(plugin, file)) return null;
-  return file.parent instanceof TFolder ? file.parent : null;
-}
-
-/**
- * The homepage note configured in the community "Homepage" plugin
- * (novov). Read from the plugin's runtime settings; returns null when
- * the plugin is absent or the entry isn't a plain file.
- */
-function resolveHomepageFile(plugin: HierarchyNavigator): TFile | null {
-  try {
-    const instance = (plugin.app as AnyApp).plugins?.plugins?.["homepage"] as
-      | HomepagePluginAPI
-      | undefined;
-    const pages = instance?.settings?.homepages;
-    if (!pages) return null;
-    const entry = pages["Main Homepage"] ?? Object.values(pages)[0];
-    if (!entry || entry.kind !== "File" || !entry.value) return null;
-    const dest = plugin.app.metadataCache.getFirstLinkpathDest(entry.value, "");
-    if (dest instanceof TFile) return dest;
-    const direct = plugin.app.vault.getAbstractFileByPath(
-      entry.value.endsWith(".md") ? entry.value : `${entry.value}.md`,
-    );
-    return direct instanceof TFile ? direct : null;
-  } catch {
-    return null;
-  }
-}
-
-function collectLogicalChildren(
-  plugin: HierarchyNavigator,
-  folder: TFolder,
-  out: Array<TFile | TFolder>,
-): void {
-  for (const child of folder.children ?? []) {
-    if (!(child instanceof TFile || child instanceof TFolder)) continue;
-    // A folder's own note represents the folder itself; it is never
-    // one of that folder's children.
-    if (child instanceof TFile && isFolderNoteFile(plugin, child, folder)) continue;
-    if (child instanceof TFile && !isSupportedByObsidian(plugin, child)) continue;
-    out.push(child);
-  }
-}
-
-/**
- * Row order for a section: folders first, then files; natural name order
- * inside each group. Folder Notes sort as the folder they stand for, and
- * the vault's own ordering is never trusted — it interleaves folders and
- * files by name, which buries the folders you navigate by.
- */
-export type Entry = TFile | TFolder;
-
-function compareEntries(a: Entry, b: Entry): number {
-  const aIsFolder = a instanceof TFolder;
-  const bIsFolder = b instanceof TFolder;
-  if (aIsFolder !== bIsFolder) return aIsFolder ? -1 : 1;
-  return a.name.localeCompare(b.name, undefined, {
-    numeric: true,
-    sensitivity: "base",
-  });
-}
-
-/**
- * Return the same filtered and sorted entries used by every navigation
- * surface. Keeping this in one place prevents commands and rendered lists
- * from drifting apart.
- */
-export function getVisibleChildren(
-  plugin: HierarchyNavigator,
-  folder: TFolder,
-  excludePaths: ReadonlySet<string> = new Set(),
-): Entry[] {
-  const collected: Entry[] = [];
-  collectLogicalChildren(plugin, folder, collected);
-  return collected
-    .filter((entry) => {
-      if (excludePaths.has(entry.path)) return false;
-      return entry instanceof TFolder
-        ? plugin.settings.showFolders
-        : plugin.settings.showFiles;
-    })
-    .sort(compareEntries);
-}
-
-/** Children of the folder represented by a Folder Note, if any. */
-export function getChildrenForFile(
-  plugin: HierarchyNavigator,
-  file: TFile,
-): Entry[] {
-  const folder = logicalFolderForFile(plugin, file);
-  if (!(folder instanceof TFolder)) return [];
-  return getVisibleChildren(plugin, folder, new Set([file.path]));
-}
-
-/* ────────────────────────────────────────────────
-   Tiny DOM helpers — never use `<ul>` or `<li>`.
-   That way we don't trip over user CSS, theme
-   rules, or `.internal-link` ul lists.
-   ──────────────────────────────────────────────── */
-
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  opts: {
-    cls?: string;
-    text?: string;
-    attr?: Record<string, string>;
-    children?: (Element | string)[];
-  } = {},
-): HTMLElementTagNameMap[K] {
-  const node = createEl(tag, {
-    cls: opts.cls,
-    text: opts.text,
-    attr: opts.attr,
-  });
-  node.append(...(opts.children ?? []));
-  return node;
-}
-
-function openTarget(
-  plugin: HierarchyNavigator,
-  target: TFile | TFolder,
-): void {
-  if (target instanceof TFile) {
-    void plugin.app.workspace.openLinkText(target.path, "", false);
-    return;
-  }
-  const explorer = plugin.app.workspace.getLeavesOfType("file-explorer")[0];
-  const view = (explorer as { view?: { revealInFolder?: (t: unknown) => void } } | undefined)?.view;
-  view?.revealInFolder?.(target);
-}
-
-/* ────────────────────────────────────────────────
-   Single-line inline layout
-   ──────────────────────────────────────────────── */
 
 interface Segment {
-  /** Single-line label for the column header — e.g. "Parent". */
   label: string;
-  /** SVG icon placed to the LEFT of the label. */
   icon: SVGElement;
-  /**
-   * Items to render. Never empty: a section without items is not a section,
-   * and the caller drops the row entirely rather than printing a placeholder
-   * — `buildSegment` relies on this.
-   */
-  items: Array<{
-    /** Resolve where to jump when this item is clicked. */
-    target: TFile | TFolder;
-    /** Display text. */
-    name: string;
-    /** `file` / `dir`. Used to pick an inline icon next to the name. */
-    kind: "file" | "dir" | "folder-note" | "home";
-    /**
-     * File extension driving the type icon — files only. Absent for
-     * folders, folder notes and the homepage, which have fixed glyphs.
-     */
-    ext?: string;
-  }>;
+  items: SegmentItem[];
 }
 
-function makeItem(plugin: HierarchyNavigator, entry: Entry) {
+function makeItem(plugin: HierarchyNavigator, entry: Entry): SegmentItem {
   if (entry instanceof TFolder) {
-    // A folder navigates as itself, or as the Folder Note standing in
-    // for it — which is also what decides its glyph.
     const note = findFolderNoteFile(plugin, entry);
     return {
       target: note ?? entry,
       name: entry.name,
-      kind: note ? ("folder-note" as const) : ("dir" as const),
+      kind: note ? "folder-note" : "dir",
     };
   }
-  // Plain file: the extension decides which glyph the pill wears.
   return {
     target: entry,
     name: entry.basename,
-    kind: "file" as const,
+    kind: "file",
     ext: entry.extension,
   };
 }
 
-function isFolderNoteFile(
-  plugin: HierarchyNavigator,
-  entry: Entry,
-  folder: TFolder,
-): boolean {
-  return entry instanceof TFile && entry.path === findFolderNoteFile(plugin, folder)?.path;
+function itemIcon(item: SegmentItem): SVGElement {
+  if (item.kind === "folder-note") return Icons.folderNote();
+  if (item.kind === "home") return Icons.home();
+  if (item.kind === "dir") return Icons.folder();
+  if (item.ext !== undefined) return fileTypeIcon(item.ext);
+  return Icons.file();
 }
 
-function makePill(
-  plugin: HierarchyNavigator,
-  it: Segment["items"][number],
-): HTMLElement {
-  const typeMod = it.kind === "file" && it.ext !== undefined
-    ? ` ${fileTypeClass(it.ext)}`
+function makePill(plugin: HierarchyNavigator, item: SegmentItem): HTMLElement {
+  const typeMod = item.kind === "file" && item.ext !== undefined
+    ? ` ${fileTypeClass(item.ext)}`
     : "";
-  const pill = el(it.target instanceof TFile ? "a" : "button", {
-    cls: `hn-pill hn-kind-${it.kind}${typeMod}`,
-    attr: it.target instanceof TFile
-      ? { href: it.target.path, "data-href": it.target.path }
-      : { type: "button", "data-href": it.target.path },
+  const pill = el(item.target instanceof TFile ? "a" : "button", {
+    cls: `hn-pill hn-kind-${item.kind}${typeMod}`,
+    attr: item.target instanceof TFile
+      ? { href: item.target.path, "data-href": item.target.path }
+      : { type: "button", "data-href": item.target.path },
   });
-  pill.appendChild(
-    it.kind === "folder-note"
-      ? Icons.folderNote()
-      : it.kind === "home"
-        ? Icons.home()
-        : it.kind === "dir"
-          ? Icons.folder()
-          : it.ext !== undefined
-            ? fileTypeIcon(it.ext)
-            : Icons.file(),
-  );
-  pill.appendChild(el("span", { cls: "hn-pill-name", text: it.name }));
-  pill.addEventListener("click", (ev) => {
-    ev.preventDefault();
-    openTarget(plugin, it.target);
+  pill.appendChild(itemIcon(item));
+  pill.appendChild(el("span", { cls: "hn-pill-name", text: item.name }));
+  pill.addEventListener("click", (event) => {
+    event.preventDefault();
+    openTarget(plugin, item.target);
   });
   return pill;
 }
 
-/**
- * The "+N" overflow chip: a peeking list of everything that did not fit on
- * the row.
- *
- * It is a native `<details>` so the toggle stays keyboard-reachable, but the
- * open/close *feel* is driven from here: native toggling drops the panel the
- * instant `open` is removed, which would make the exit animation invisible,
- * so `open` is held until the exit transition has run. On top of the click
- * toggle it dismisses when the pointer leaves, when another element is
- * pressed, and on Escape — a peek panel should not linger.
- */
 interface OverflowPanel {
-  /** The `<details>` element — chip plus panel. */
   root: HTMLElement;
-  /** Hand the panel exactly these items; their DOM is created on open. */
-  setItems(items: Segment["items"]): void;
-  /** Dismiss it if it is open. */
-  close(): void;
+  setItems(items: SegmentItem[]): void;
 }
+
+const refitters = new WeakMap<HTMLElement, Array<() => void>>();
+const overflowDestroyers = new WeakMap<HTMLElement, () => void>();
 
 function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
   const more = el("details", { cls: "hn-more" });
-  const chip = el("summary", {
-    cls: "hn-more-chip",
-    text: "+0",
-  });
-  more.appendChild(chip);
+  const chip = el("summary", { cls: "hn-more-chip", text: "+0" });
   const menu = el("div", { cls: "hn-more-menu" });
-  more.appendChild(menu);
+  more.append(chip, menu);
 
-  let overflowItems: Segment["items"] = [];
+  let items: SegmentItem[] = [];
   let openTimer = 0;
   let closeTimer = 0;
   let hideTimer = 0;
   let pointerInside = false;
-  /** Set when the pointer clicks the chip shut, so hovering can't undo it. */
   let dismissedByClick = false;
 
   const isOpen = () => more.classList.contains("hn-open");
   const renderItems = () => {
-    if (menu.childElementCount > 0 || overflowItems.length === 0) return;
-    menu.replaceChildren(
-      ...overflowItems.map((item, index) => {
-        const pill = makePill(plugin, item);
-        pill.setCssProps({ "--hn-i": String(Math.min(index, 6)) });
-        return pill;
-      }),
-    );
+    if (menu.childElementCount > 0 || items.length === 0) return;
+    menu.replaceChildren(...items.map((item, index) => {
+      const pill = makePill(plugin, item);
+      pill.setCssProps({ "--hn-i": String(Math.min(index, 6)) });
+      return pill;
+    }));
   };
   const open = () => {
     if (isOpen()) return;
@@ -377,12 +116,7 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
     window.clearTimeout(closeTimer);
     more.open = true;
     renderItems();
-    // Flush the freshly shown panel so the transition has a "from" state.
     void menu.offsetHeight;
-    // Hand the bridge (styles.css) the panel's real width so the pointer can
-    // travel from the chip into the panel without crossing dead space.
-    // `offsetWidth` is the layout width — at this instant the panel still
-    // carries its 0.97 entry scale, which a bounding rect would report.
     more.setCssProps({ "--hn-bridge-w": `${menu.offsetWidth}px` });
     more.classList.add("hn-open");
   };
@@ -396,11 +130,9 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
     }, MENU_MS);
   };
 
-  chip.addEventListener("click", (ev) => {
-    ev.preventDefault();
+  chip.addEventListener("click", (event) => {
+    event.preventDefault();
     if (isOpen()) {
-      // Only worth guarding while the pointer is actually resting on the
-      // chip — a keyboard close should not swallow the next hover.
       dismissedByClick = pointerInside;
       close();
     } else {
@@ -408,7 +140,6 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
       open();
     }
   });
-
   more.addEventListener("mouseenter", () => {
     pointerInside = true;
     window.clearTimeout(openTimer);
@@ -416,7 +147,6 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
     if (dismissedByClick || isOpen()) return;
     openTimer = window.setTimeout(open, MENU_HOVER_OPEN_MS);
   });
-
   more.addEventListener("mouseleave", () => {
     pointerInside = false;
     dismissedByClick = false;
@@ -424,36 +154,30 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
     window.clearTimeout(closeTimer);
     closeTimer = window.setTimeout(close, MENU_HOVER_CLOSE_MS);
   });
-
-  more.addEventListener("keydown", (ev: KeyboardEvent) => {
-    if (ev.key !== "Escape" || !isOpen()) return;
-    ev.preventDefault();
-    ev.stopPropagation();
+  more.addEventListener("keydown", (event: KeyboardEvent) => {
+    if (event.key !== "Escape" || !isOpen()) return;
+    event.preventDefault();
+    event.stopPropagation();
     close();
     chip.focus();
   });
 
-  // Covers keyboard-opened panels (no pointer ever left them) and clicks
-  // elsewhere on the note. The owner releases this listener when discarded.
-  const onPointerDown = (ev: PointerEvent) => {
-    if (isOpen() && !more.contains(ev.target as Node)) close();
+  const onPointerDown = (event: PointerEvent) => {
+    if (isOpen() && !more.contains(event.target as Node)) close();
   };
   document.addEventListener("pointerdown", onPointerDown, true);
-
-  const destroy = () => {
+  overflowDestroyers.set(more, () => {
     window.clearTimeout(openTimer);
     window.clearTimeout(closeTimer);
     window.clearTimeout(hideTimer);
     document.removeEventListener("pointerdown", onPointerDown, true);
     more.open = false;
-  };
-  overflowDestroyers.set(more, destroy);
+  });
 
   return {
     root: more,
-    close,
-    setItems(items) {
-      overflowItems = items;
+    setItems(nextItems) {
+      items = nextItems;
       menu.replaceChildren();
       if (isOpen()) renderItems();
       chip.textContent = `+${items.length}`;
@@ -461,73 +185,50 @@ function makeOverflowMenu(plugin: HierarchyNavigator): OverflowPanel {
         "title",
         getStrings(plugin.settings.language).overflowChip(items.length),
       );
-      // Nothing left over: the chip takes no room at all.
       more.classList.toggle("hn-hidden", items.length === 0);
       if (items.length === 0) close();
     },
   };
 }
 
-/**
- * Fit passes, one per single-line section, keyed by the block they belong
- * to. They need the block to be in the document (the fit is measured, not
- * guessed), so `main.ts` runs them right after mounting.
- */
-const refitters = new WeakMap<HTMLElement, Array<() => void>>();
-const overflowDestroyers = new WeakMap<HTMLElement, () => void>();
-
-/** Release listeners and timers owned by a rendered plugin element. */
 export function destroyOwnedElement(element: HTMLElement): void {
-  const overflowElements = [
+  const menus = [
     ...(element.matches(".hn-more") ? [element] : []),
     ...Array.from(element.querySelectorAll<HTMLElement>(".hn-more")),
   ];
-  overflowElements.forEach((overflow) => {
-    overflowDestroyers.get(overflow)?.();
-    overflowDestroyers.delete(overflow);
+  menus.forEach((menu) => {
+    overflowDestroyers.get(menu)?.();
+    overflowDestroyers.delete(menu);
   });
   refitters.delete(element);
 }
 
-/** Re-fit every single-line section of a mounted block to its real width. */
 export function refitSections(block: HTMLElement): void {
   for (const refit of refitters.get(block) ?? []) refit();
 }
 
 function buildSegment(
   plugin: HierarchyNavigator,
-  seg: Segment,
+  segment: Segment,
   onRefit: (fn: () => void) => void,
 ): HTMLElement {
   const root = el("div", { cls: "hn-segment" });
-  // Head and body become the two cells of one grid row in `.hn-segments`.
   const head = el("div", { cls: "hn-segment-head" });
-  head.appendChild(seg.icon);
-  head.appendChild(el("span", { cls: "hn-segment-label", text: seg.label }));
+  head.append(segment.icon, el("span", {
+    cls: "hn-segment-label",
+    text: segment.label,
+  }));
   root.appendChild(head);
 
   const body = el("div", { cls: "hn-segment-body" });
-  // A segment is only ever built when it has items — the caller drops an empty
-  // section rather than rendering a placeholder, so there is no empty case to
-  // handle here.
-  // `maxVisibleItems` is the ceiling for a section; anything above it — and
-  // in a single line, anything the row cannot physically show — lives in
-  // the "+N" panel.
-  const cap = Math.max(
-    1,
-    Math.floor(plugin.settings.maxVisibleItems) || 1,
-  );
-  const visibleItems = seg.items.slice(0, cap);
-  const pills = visibleItems.map((it) => makePill(plugin, it));
+  const cap = Math.max(1, Math.floor(plugin.settings.maxVisibleItems) || 1);
+  const pills = segment.items.slice(0, cap).map((item) => makePill(plugin, item));
   const list = el("div", { cls: "hn-pills" });
-  body.appendChild(list);
   const panel = makeOverflowMenu(plugin);
   const wrap = plugin.settings.sectionLayout === "wrap";
-  // Wrapped sections put the chip inside the flowing row, so it trails the
-  // last pill; a single line keeps it outside, pinned after the row.
   const chipHome = wrap ? list : body;
+  body.appendChild(list);
 
-  /** Show the first `visible` pills in the row, the rest in the panel. */
   const apply = (visible: number) => {
     pills.forEach((pill, index) => {
       if (index < visible) {
@@ -536,29 +237,24 @@ function buildSegment(
         pill.remove();
       }
     });
-    panel.setItems(seg.items.slice(visible));
-    // Re-append last: moving pills in and out of the row must never leave
-    // the chip ahead of them.
+    panel.setItems(segment.items.slice(visible));
     chipHome.appendChild(panel.root);
   };
 
   const initial = Math.min(cap, pills.length);
   apply(initial);
-
   if (!wrap && pills.length > 0) {
-    // A single clipped line: measure how many pills really fit and hand the
-    // rest to the panel, so nothing is ever half-hidden behind the edge.
     const fit = () => {
       if (!list.isConnected) return;
       let visible = initial;
       for (let pass = 0; pass < 4; pass++) {
         apply(visible);
         const edge = list.getBoundingClientRect().right;
-        if (edge === 0) return; // not laid out yet — a later pass will do it
+        if (edge === 0) return;
         let over = visible;
-        for (let i = 0; i < visible; i++) {
-          if (list.children[i].getBoundingClientRect().right > edge + 0.5) {
-            over = i;
+        for (let index = 0; index < visible; index++) {
+          if (list.children[index].getBoundingClientRect().right > edge + 0.5) {
+            over = index;
             break;
           }
         }
@@ -571,19 +267,12 @@ function buildSegment(
               continue;
             }
           }
-          return; // the whole row fits
+          return;
         }
-        // `over` can be 0: in a pane too narrow for even one pill, showing
-        // a clipped pill would be worse than showing none — the panel then
-        // holds the whole section.
         visible = over;
       }
     };
     onRefit(fit);
-    // The row has to be laid out before it can be measured. The caller
-    // inserts the block synchronously after this returns, so a microtask
-    // measures it before the browser paints; the frame callback is the
-    // fallback for callers that insert later.
     queueMicrotask(fit);
     window.requestAnimationFrame(fit);
   }
@@ -591,382 +280,117 @@ function buildSegment(
   return root;
 }
 
-/* ────────────────────────────────────────────────
-   Public entry — build the entire block.
-   ──────────────────────────────────────────────── */
+function buildSegments(
+  plugin: HierarchyNavigator,
+  file: TFile,
+  onRefit: (fn: () => void) => void,
+): HTMLElement {
+  const settings = plugin.settings;
+  const strings = getStrings(settings.language);
+  const logicalFolder = logicalFolderForFile(plugin, file);
+  const hierarchyFolder = logicalFolder ?? file.parent;
+  const segments = el("div", { cls: "hn-segments" });
+  segments.classList.toggle("hn-wrap", settings.sectionLayout === "wrap");
+
+  const parentTarget = settings.showParent ? getParentTarget(plugin, file) : null;
+  if (parentTarget) {
+    const item = parentTarget instanceof TFolder
+      ? makeItem(plugin, parentTarget)
+      : {
+          target: parentTarget,
+          name: parentTarget.basename,
+          kind: "home" as const,
+        };
+    segments.appendChild(buildSegment(plugin, {
+      label: strings.parent,
+      icon: Icons.chevronUp(),
+      items: [item],
+    }, onRefit));
+  }
+
+  if (settings.showSiblings && hierarchyFolder instanceof TFolder) {
+    const siblingFolder = logicalFolder?.parent ?? file.parent;
+    const exclude = new Set([logicalFolder?.path ?? file.path, file.path]);
+    const siblings = siblingFolder instanceof TFolder
+      ? getVisibleChildren(plugin, siblingFolder, exclude)
+      : [];
+    if (siblings.length > 0) {
+      segments.appendChild(buildSegment(plugin, {
+        label: strings.siblings,
+        icon: Icons.hash(),
+        items: siblings.map((entry) => makeItem(plugin, entry)),
+      }, onRefit));
+    }
+  }
+
+  if (settings.showFolders || settings.showFiles) {
+    const children = getChildrenForFile(plugin, file);
+    if (children.length > 0) {
+      segments.appendChild(buildSegment(plugin, {
+        label: strings.children,
+        icon: Icons.chevronDown(),
+        items: children.map((entry) => makeItem(plugin, entry)),
+      }, onRefit));
+    }
+  }
+  return segments;
+}
 
 export function renderHierarchyBlock(
   plugin: HierarchyNavigator,
   file: TFile,
 ): HTMLElement {
   const settings = plugin.settings;
-  const t = getStrings(settings.language);
-
-  // Collect data into segments up front. A section with nothing to show is
-  // dropped outright rather than rendered as an empty placeholder: the block
-  // is navigation, and a row that says "nothing here" navigates nowhere.
-  // Folder Notes occupy the same hierarchy position as their containing
-  // folder. The markdown file is only the navigation target for that node.
-  const logicalFolder = logicalFolderForFile(plugin, file);
-  const hierarchyFolder = logicalFolder ?? file.parent;
-  const parent = logicalFolder?.parent ?? file.parent;
-
-  // The Parent row is only rendered when there is something to navigate
-  // to: the containing folder, or — at the vault root — the homepage
-  // note from the Homepage plugin. At the root without a homepage (or
-  // while already on the homepage itself) the row is dropped entirely.
-  const parentSeg: Segment | null = (() => {
-    if (!settings.showParent) return null;
-    if (parent instanceof TFolder && parent.path !== ROOT) {
-      return {
-        label: t.parent,
-        icon: Icons.chevronUp(),
-        items: [makeItem(plugin, parent)],
-      };
-    }
-    const home = resolveHomepageFile(plugin);
-    if (!home || home.path === file.path) return null;
-    return {
-      label: t.parent,
-      icon: Icons.chevronUp(),
-      items: [{ target: home, name: home.basename, kind: "home" as const }],
-    };
-  })();
-
-  let siblingsSeg: Segment | null = null;
-  if (settings.showSiblings && hierarchyFolder instanceof TFolder) {
-    // Siblings are the entries next to our logical node: for a Folder Note
-    // that is the folder's own parent, otherwise the file's parent folder.
-    const siblingFolder = logicalFolder?.parent ?? file.parent;
-    const mePath = logicalFolder?.path ?? file.path;
-    const filtered = siblingFolder instanceof TFolder
-      ? getVisibleChildren(plugin, siblingFolder, new Set([mePath, file.path]))
-      : [];
-    // Nothing beside this note: the row goes away instead of standing there
-    // empty. That is the common case for a lone note in a folder.
-    if (filtered.length > 0) {
-      siblingsSeg = {
-        label: t.siblings,
-        icon: Icons.hash(),
-        items: filtered.map((s) => makeItem(plugin, s)),
-      };
-    }
-  }
-
-  const childrenSeg: Segment | null = (() => {
-    if (!settings.showFolders && !settings.showFiles) return null;
-    // A plain note is a leaf: it has no children of its own, and its
-    // siblings are not its children — the Siblings row already covers those.
-    // Only a Folder Note stands for a folder, and only then is there contents
-    // to navigate into.
-    if (!(logicalFolder instanceof TFolder)) return null;
-    const filtered = getChildrenForFile(plugin, file);
-    // An empty folder, or a folder whose contents are all filtered out, has
-    // no Children row — same rule as everywhere else.
-    if (filtered.length === 0) return null;
-    return {
-      label: t.children,
-      icon: Icons.chevronDown(),
-      items: filtered.map((c) => makeItem(plugin, c)),
-    };
-  })();
-
-  // Layout: a 2-row pill — `rail` row on top, `segments` row below
-  // (so it stays one visual block). The rail is always there: it carries the
-  // header label and the fold toggle, so the block keeps its identity even
-  // when every section below it has nothing to show.
   const block = el("div", { cls: BLOCK_CLASS });
-  // Section layout rides on the block root so styles.css can switch the
-  // pill rows between one clipped line and free wrapping.
-  if (settings.sectionLayout === "wrap") block.classList.add("hn-wrap");
+  block.classList.toggle("hn-wrap", settings.sectionLayout === "wrap");
   block.setAttribute("data-hn-placement", "after-title");
-  // The header row doubles as the collapse toggle: clicking anywhere on it
-  // folds the whole block. The chevron sits left of the label, following
-  // the usual disclosure convention (Notion toggle headings, Obsidian
-  // callouts, the file explorer).
+
   const rail = el("div", { cls: "hn-rail" });
   rail.setAttribute("role", "button");
   rail.setAttribute("tabindex", "0");
   rail.setAttribute("aria-expanded", String(!settings.collapsed));
-  rail.appendChild(
-    el("div", {
-      cls: "hn-rail-left",
-      children: [
-        el("span", { cls: "hn-rail-toggle", children: [Icons.chevronDown()] }),
-        Icons.compass(),
-        el("span", { cls: "hn-rail-label", text: settings.headerTitle || "Hierarchy" }),
-      ],
-    }),
-  );
-  const applyCollapsed = (next: boolean, animate = true) => {
-    block.classList.toggle("hn-collapsed", next);
-    rail.setAttribute("aria-expanded", String(!next));
-    // Folding hides the body, so close any "+N" panel left open behind it
-    // (its own chip handler runs the exit animation); otherwise it would
-    // reappear already-expanded on the next unfold.
-    if (next) {
-      block
-        .querySelectorAll<HTMLElement>(".hn-more.hn-open > .hn-more-chip")
-        .forEach((openChip) => openChip.click());
+  rail.appendChild(el("div", {
+    cls: "hn-rail-left",
+    children: [
+      el("span", { cls: "hn-rail-toggle", children: [Icons.chevronDown()] }),
+      Icons.compass(),
+      el("span", { cls: "hn-rail-label", text: settings.headerTitle || "Hierarchy" }),
+    ],
+  }));
+
+  const applyCollapsed = (collapsed: boolean, animate = true) => {
+    block.classList.toggle("hn-collapsed", collapsed);
+    rail.setAttribute("aria-expanded", String(!collapsed));
+    if (collapsed) {
+      block.querySelectorAll<HTMLElement>(".hn-more.hn-open > .hn-more-chip")
+        .forEach((chip) => chip.click());
     }
-    if (!animate || next) return;
-    // Expanding: clip the wrapper while the row grows, then release it so
-    // the "+N" dropdown can overflow the block again.
+    if (!animate || collapsed) return;
     block.classList.add("hn-folding");
     window.setTimeout(() => block.classList.remove("hn-folding"), FOLD_MS + 40);
   };
   const toggleCollapsed = () => {
-    const next = !block.classList.contains("hn-collapsed");
-    plugin.settings.collapsed = next;
-    applyCollapsed(next);
+    const collapsed = !block.classList.contains("hn-collapsed");
+    plugin.settings.collapsed = collapsed;
+    applyCollapsed(collapsed);
     void plugin.saveSettings().catch(() => {
-      // The in-memory state is already applied; a later refresh can retry it.
+      // The current view already reflects the setting; the next refresh retries persistence.
     });
   };
   rail.addEventListener("click", toggleCollapsed);
-  rail.addEventListener("keydown", (ev: KeyboardEvent) => {
-    if (ev.key === "Enter" || ev.key === " ") {
-      ev.preventDefault();
+  rail.addEventListener("keydown", (event: KeyboardEvent) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
       toggleCollapsed();
     }
   });
   block.appendChild(rail);
 
-  const segments = el("div", { cls: "hn-segments" });
-  segments.classList.toggle("hn-wrap", settings.sectionLayout === "wrap");
   const refits: Array<() => void> = [];
-  const onRefit = (fn: () => void) => refits.push(fn);
-  if (parentSeg) segments.appendChild(buildSegment(plugin, parentSeg, onRefit));
-  if (siblingsSeg) segments.appendChild(buildSegment(plugin, siblingsSeg, onRefit));
-  if (childrenSeg) segments.appendChild(buildSegment(plugin, childrenSeg, onRefit));
-  // The wrapper exists purely so the fold can animate its grid row.
   const fold = el("div", { cls: "hn-fold" });
-  fold.appendChild(segments);
+  fold.appendChild(buildSegments(plugin, file, (refit) => refits.push(refit)));
   block.appendChild(fold);
-
   applyCollapsed(settings.collapsed, false);
-  // The fit passes need a laid-out row; `main.ts` runs them once the block
-  // is in the document, and again whenever a pane is resized.
   if (refits.length > 0) refitters.set(block, refits);
-
   return block;
-}
-
-/* ────────────────────────────────────────────────
-   Eligibility + per-element guard
-   ──────────────────────────────────────────────── */
-
-export function isEligible(plugin: HierarchyNavigator, file: TFile | null): file is TFile {
-  if (!file) return false;
-  if (file.extension !== "md") return false;
-  if (isHiddenByFrontmatter(plugin, file)) return false;
-  return true;
-}
-
-
-/* ────────────────────────────────────────────────
-   Body index — the Children of this note, rendered
-   into the note under the header rail.
-   ──────────────────────────────────────────────── */
-
-/** Class of the body index block — `main.ts` mounts and removes it. */
-export const INDEX_CLASS = "hn-index";
-
-/** Everything this plugin owns inside a view: header block + body index. */
-export const OWNED_SELECTOR = `.${BLOCK_CLASS}, .${INDEX_CLASS}`;
-
-/**
- * The note's own Properties block, in whichever container the theme draws it.
- * An embedded note or a Base card renders one too, so callers filter those out
- * (`.markdown-embed, .internal-embed`) before treating it as this note's.
- */
-export const PROPERTIES_SELECTOR = ".metadata-container, .metadata-properties";
-
-/** Remove a frontmatter block without treating YAML contents as a regex. */
-function removeFrontmatter(text: string): string {
-  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
-  if (lines[0]?.trim() !== "---") return text;
-  const closing = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
-  return closing < 0 ? text : lines.slice(closing + 1).join("\n");
-}
-
-/**
- * Coarse relative time — "just now" / "3 hours ago", falling back to a
- * plain date once that stops being useful. Deliberately not built on
- * `Intl.RelativeTimeFormat`: its wording varies far too much between
- * machines, so the phrasing comes from the language table instead.
- */
-function relativeTime(ms: number, t: Strings): string {
-  const diff = Date.now() - ms;
-  const minute = 60_000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-  if (!Number.isFinite(ms) || ms <= 0) return "";
-  if (diff < minute) return t.justNow;
-  if (diff < hour) return t.minutesAgo(Math.round(diff / minute));
-  if (diff < day) return t.hoursAgo(Math.round(diff / hour));
-  if (diff < 7 * day) return t.daysAgo(Math.round(diff / day));
-  const d = new Date(ms);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
-/**
- * Is this note's body empty — only whitespace, or only frontmatter?
- *
- * That is the "nothing written yet" case the index exists for. Frontmatter
- * is not body text: a folder note that is nothing but properties is still an
- * empty page. `null` means the metadata cache has not been built yet, so the
- * caller should read the file text rather than guess — a wrong `true` here
- * puts launcher rows above writing that exists.
- */
-export function isNoteBodyEmpty(
-  plugin: HierarchyNavigator,
-  file: TFile,
-): boolean | null {
-  const cache = plugin.app.metadataCache.getFileCache(file);
-  if (!cache) return null;
-  const body = (cache.sections ?? []).filter((s) => s.type !== "yaml");
-  return body.length === 0 && !(cache.headings && cache.headings.length > 0);
-}
-
-/** The same question answered from raw text, for files with no cache yet. */
-export function isRawBodyEmpty(text: string): boolean {
-  return removeFrontmatter(text).trim() === "";
-}
-
-/**
- * The body index's create button — the plugin's one control that writes.
- *
- * It is a launcher affordance, not navigation, so it wears the same quiet pill
- * as the rest of the index rather than a button skin; the label and its
- * tooltip come from the same string, which keeps the icon-only phone layout
- * (`.hn-index-new-label` is hidden there) described for screen readers too.
- */
-function makeCreateButton(
-  plugin: HierarchyNavigator,
-  folder: TFolder,
-): HTMLElement {
-  const t = getStrings(plugin.settings.language);
-  const button = el("button", {
-    cls: "hn-index-new",
-    attr: { type: "button", "aria-label": t.createAction, title: t.createAction },
-    children: [
-      Icons.plus(),
-      el("span", { cls: "hn-index-new-label", text: t.createAction }),
-    ],
-  });
-  button.addEventListener("click", (ev) => {
-    ev.preventDefault();
-    promptCreateChild(plugin, folder);
-  });
-  return button;
-}
-
-/**
- * The body index: a Children-only launcher, rendered into the note where its
- * body would begin.
- *
- * It is a block in the document, not a panel over the pane: `main.ts` inserts
- * it directly under the header rail, so it scrolls with the text and inherits
- * the reading column's width without anyone measuring anything. That is safe
- * because the index only exists while the body is empty and only in reading
- * mode — there is no text below it to displace.
- *
- * Returns null when there is nothing worth showing, so callers can skip it.
- */
-export function renderBodyIndex(
-  plugin: HierarchyNavigator,
-  file: TFile,
-): HTMLElement | null {
-  if (!plugin.settings.showBodyIndex) return null;
-  if (!plugin.settings.showFolders && !plugin.settings.showFiles) return null;
-
-  // Same rule as the header block: only a Folder Note stands for a folder, so
-  // only a Folder Note has contents to index. A plain note is a leaf — listing
-  // its folder's other entries here would just repeat the Siblings row.
-  const folder = logicalFolderForFile(plugin, file);
-  if (!(folder instanceof TFolder) || folder.path === ROOT) return null;
-
-  const items = getChildrenForFile(plugin, file);
-  // An empty folder still has one reason to show this panel: its create
-  // button. That is the page where you most want to add the first thing — so
-  // with create switched off we keep the old behaviour and draw nothing.
-  if (items.length === 0 && !plugin.settings.enableCreate) return null;
-
-  const root = el("div", { cls: INDEX_CLASS, attr: { "data-hn-file": file.path } });
-  const t = getStrings(plugin.settings.language);
-
-  /* ── Head: label, counts, and the way into the note ── */
-  const folders = items.filter((i) => i instanceof TFolder).length;
-  const files = items.length - folders;
-  const inner = el("div", { cls: "hn-index-inner" });
-  const head = el("div", { cls: "hn-index-head" });
-  head.appendChild(Icons.grid());
-  head.appendChild(el("span", { cls: "hn-index-title", text: t.bodyIndexTitle }));
-  head.appendChild(
-    el("span", {
-      cls: "hn-index-count",
-      text:
-        items.length === 0
-          ? t.bodyIndexNothing
-          : t.bodyIndexCounts(folders, files),
-    }),
-  );
-
-  /* ── Create: the one control that writes. It sits at the far end of the
-     head, next to the folder it will write into — this index *is* the "this
-     folder is empty" page, so it is the honest place to offer it. ── */
-  if (plugin.settings.enableCreate) {
-    head.appendChild(el("span", { cls: "hn-index-spacer" }));
-    head.appendChild(makeCreateButton(plugin, folder));
-  }
-
-  inner.appendChild(head);
-
-  /* ── Body: one calm list, folders first — the sort already put them there.
-     Folder rows are bold and count their items; file rows carry the modified
-     time. No tiles, no panel: a launcher, not a dashboard. ── */
-  const body = el("div", { cls: "hn-index-body" });
-  for (const entry of items) {
-    const row = el("a", { cls: "hn-index-row", attr: { href: entry.path } });
-    if (entry instanceof TFolder) {
-      const folderNote = findFolderNoteFile(plugin, entry);
-      row.classList.add("hn-index-dir");
-      if (folderNote) row.classList.add("hn-kind-folder-note");
-      row.appendChild(folderNote ? Icons.folderNote() : Icons.folder());
-      row.appendChild(el("span", { cls: "hn-index-name", text: entry.name }));
-      row.appendChild(
-        el("span", {
-          cls: "hn-index-meta",
-          text: t.folderItemCount(entry.children?.length ?? 0),
-        }),
-      );
-      row.addEventListener("click", (ev) => {
-        ev.preventDefault();
-        openTarget(plugin, folderNote ?? entry);
-      });
-    } else if (entry instanceof TFile) {
-      row.classList.add(fileTypeClass(entry.extension));
-      row.appendChild(fileTypeIcon(entry.extension));
-      row.appendChild(el("span", { cls: "hn-index-name", text: entry.basename }));
-      row.appendChild(
-        el("span", {
-          cls: "hn-index-meta",
-          text: relativeTime(entry.stat?.mtime ?? 0, t),
-        }),
-      );
-      row.addEventListener("click", (ev) => {
-        ev.preventDefault();
-        openTarget(plugin, entry);
-      });
-    } else {
-      continue;
-    }
-    body.appendChild(row);
-  }
-  inner.appendChild(body);
-  root.appendChild(inner);
-
-  return root;
 }

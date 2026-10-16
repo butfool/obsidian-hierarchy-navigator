@@ -16,18 +16,16 @@ import { getStrings } from "./i18n";
 import { HierarchyNavigatorSettingTab } from "./settingTab";
 import {
   renderHierarchyBlock,
-  renderBodyIndex,
-  isNoteBodyEmpty,
-  isRawBodyEmpty,
   refitSections,
-  isEligible,
   BLOCK_CLASS,
   INDEX_CLASS,
   OWNED_SELECTOR,
   PROPERTIES_SELECTOR,
   destroyOwnedElement,
-  getChildrenForFile,
 } from "./renderer";
+import { renderBodyIndex, isNoteBodyEmpty, isRawBodyEmpty } from "./views/body-index";
+import { getChildrenForFile, isEligible } from "./hierarchy";
+
 
 interface MountState {
   frameId: number | null;
