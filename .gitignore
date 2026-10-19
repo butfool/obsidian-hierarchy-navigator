@@ -1,5 +1,23 @@
+# 依赖
 node_modules/
+
+# 构建产物与本地数据
 main.js
 data.json
-*.log
+*.tsbuildinfo
+
+# 本地发布打包
+hierarchy-navigator-*.zip
+
+# 本地工具目录
+.pi/
+.archify/
+.vscode/
+
+# Obsidian 仓库结构（把仓库放进 vault 时产生）
+.obsidian/
+
+# 系统与编辑器产物
 .DS_Store
+Thumbs.db
+*.log
