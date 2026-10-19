@@ -133,3 +133,7 @@ The `0.3.3` tag above is only a next-version example; replace it with the actual
 ## License
 
 [MIT](LICENSE) © 2026 butcool
+
+## Friend links
+
+[Linux Do](https://linux.do)

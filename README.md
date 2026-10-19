@@ -137,3 +137,7 @@ git push origin 0.3.3
 ## License
 
 [MIT](LICENSE) © 2026 butcool
+
+## 友链
+
+[Linux Do](https://linux.do)
