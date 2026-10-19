@@ -11,6 +11,7 @@
 </p>
 
 [![Version](https://img.shields.io/badge/Version-0.3.3-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
+[![Community plugins](https://img.shields.io/obsidian/plugins?id=hierarchy-navigator&label=Community%20plugins&logo=obsidian&logoColor=white)](https://obsidian.md/plugins?id=hierarchy-navigator)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.13.0%2B-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md)
 [![License](https://img.shields.io/badge/License-MIT-3DA639?logo=opensourceinitiative&logoColor=white)](LICENSE)
 
@@ -48,7 +49,16 @@ Hierarchy Navigator renders a parent / siblings / children navigation block at t
 
 ## Install
 
-插件尚未上架社区插件市场，当前通过手动安装或 BRAT 使用。
+插件已经上架社区插件市场。
+
+### 社区插件市场（推荐）
+
+1. 在 Obsidian 中打开 **Settings → Community plugins**，点击 **Browse**，搜索 `Hierarchy Navigator`。
+2. 点击 **Install**，然后在 **Installed plugins** 中启用 **Hierarchy Navigator**。
+
+也可以直接点击下面的链接安装：[obsidian://show-plugin?id=hierarchy-navigator](obsidian://show-plugin?id=hierarchy-navigator)
+
+插件市场页面：<https://obsidian.md/plugins?id=hierarchy-navigator>
 
 ### 手动安装
 
@@ -110,7 +120,7 @@ npm run dev      # 监听 src/ 目录，每次改动重新构建 main.js
 
 发布工作流位于 `.github/workflows/release.yml`。它只构建标签对应的已提交代码，使用锁文件安装依赖，校验标签与版本一致，额外打包带 `hierarchy-navigator/` 目录的安装 ZIP，并为三个标准附件和 ZIP 生成构建来源证明。
 
-1. 将 `manifest.json`、`package.json` 和 `package-lock.json` 中的版本统一为新的 `x.y.z`，同步 README 版本徽章。若提高 `minAppVersion`，按需维护 `versions.json` 中的旧版本映射。
+1. 将 `manifest.json`、`package.json` 和 `package-lock.json` 中的版本统一为新的 `x.y.z`，同步 README 版本徽章。若提高 `minAppVersion`，按需在 [obsidianmd/obsidian-releases](https://github.com/obsidianmd/obsidian-releases) 的 `versions.json` 中维护旧版本映射。
 2. 完成验证并提交、推送本次发布的全部目标改动。不要从含未提交源码的工作区构建发布附件。
 3. 创建与 manifest 版本完全相同的标签（不带 `v`），例如：
 
@@ -122,7 +132,7 @@ git push origin 0.3.3
 4. 等待 **Actions → Release Obsidian plugin** 成功。它会创建草稿 Release，并上传 `main.js`、`manifest.json`、`styles.css` 和 `hierarchy-navigator-x.y.z.zip`。
 5. 核对附件和发布说明，然后选择 **Publish release**。草稿尚不能作为公开安装来源。
 
-上面的 `0.3.3` 仅为下一版本示例，必须替换成 manifest 中的实际版本。首次进入官方社区目录仍需单独在 [community.obsidian.md](https://community.obsidian.md/) 提交，创建 GitHub Release 不等于已经上架。
+上面的 `0.3.3` 仅为下一版本示例，必须替换成 manifest 中的实际版本。插件已上架社区插件市场，发布新版本后还需要在 [obsidianmd/obsidian-releases](https://github.com/obsidianmd/obsidian-releases) 更新 `community-plugins.json` 中的版本号，市场才会同步该版本；商店页面的说明文字来自本仓库的 `README.md`。
 
 ## License
 
