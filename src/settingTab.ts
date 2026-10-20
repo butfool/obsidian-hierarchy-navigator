@@ -98,11 +98,6 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
         heading: t.createHeading,
         items: [
           this.toggle("enableCreate", t.enableCreateName, t.enableCreateDesc),
-          this.toggle(
-            "createFolderNote",
-            t.createFolderNoteName,
-            t.createFolderNoteDesc,
-          ),
         ],
       },
     ];
@@ -120,7 +115,6 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       case "showFiles":
       case "showBodyIndex":
       case "enableCreate":
-      case "createFolderNote":
         return this.plugin.settings[key];
       case "sectionLayout":
         return this.plugin.settings.sectionLayout;
@@ -156,7 +150,6 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       case "showFiles":
       case "showBodyIndex":
       case "enableCreate":
-      case "createFolderNote":
         if (typeof value === "boolean") {
           this.plugin.settings[key] = value;
         }
@@ -173,8 +166,7 @@ export class HierarchyNavigatorSettingTab extends PluginSettingTab {
       | "showFolders"
       | "showFiles"
       | "showBodyIndex"
-      | "enableCreate"
-      | "createFolderNote",
+      | "enableCreate",
     name: string,
     desc: string,
   ): SettingDefinition {

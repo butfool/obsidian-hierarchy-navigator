@@ -10,7 +10,7 @@
   <a href="README.en.md">English</a>
 </p>
 
-[![Version](https://img.shields.io/badge/Version-0.3.3-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
+[![Version](https://img.shields.io/badge/Version-0.3.4-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
 [![Community plugins](https://img.shields.io/obsidian/plugins?id=hierarchy-navigator&label=Community%20plugins&logo=obsidian&logoColor=white)](https://obsidian.md/plugins?id=hierarchy-navigator)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.13.0%2B-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md)
 [![License](https://img.shields.io/badge/License-MIT-3DA639?logo=opensourceinitiative&logoColor=white)](LICENSE)
@@ -43,7 +43,9 @@ Hierarchy Navigator renders a parent / siblings / children navigation block at t
 - 区块内文件夹排在文件前面，按自然顺序排列，`9` 排在 `10` 之前
 - 文件夹与笔记使用统一尺寸的导航胶囊；Folder Note 通过蓝色图标区分
 - 每个条目按文件类型着色区分：笔记、Canvas、Base、PDF、图片、音频、视频、代码
-- Folder Note 正文为空时，在正文区渲染子项索引，可直接在其中新建笔记或文件夹
+- Folder Note 正文为空时，在正文区渲染子项索引；没有子项时只显示轻量的「新建子项」入口
+- 创建弹窗提供带图标的「普通笔记 / 文件夹笔记 / 文件夹」三段式选择器，默认选择文件夹笔记；切换类型保留名称，实时预览目录结构，弹窗高度保持固定并适配小屏幕
+- 普通笔记创建后直接打开；文件夹笔记创建同名文件夹及入口笔记并打开入口；空文件夹创建后刷新列表
 - 新建操作走 Obsidian 自身的 `createNewMarkdownFile`，不会覆盖已存在的路径
 - 界面提供 English 与 简体中文，在设置中切换后立即生效，无需重载
 
@@ -62,7 +64,7 @@ Hierarchy Navigator renders a parent / siblings / children navigation block at t
 
 ### 手动安装
 
-1. 打开 [Releases](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)，下载 `hierarchy-navigator-x.y.z.zip` 安装包（例如 `hierarchy-navigator-0.3.3.zip`），不要下载 Source code 压缩包。
+1. 打开 [Releases](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)，下载 `hierarchy-navigator-x.y.z.zip` 安装包（例如 `hierarchy-navigator-0.3.4.zip`），不要下载 Source code 压缩包。
 2. 解压后，将整个 `hierarchy-navigator` 文件夹放到 `YOUR_VAULT/.obsidian/plugins/` 下。
 3. 在 **Settings → Community plugins → Installed plugins** 中启用 **Hierarchy Navigator**。
 
@@ -92,7 +94,6 @@ https://github.com/butfool/obsidian-hierarchy-navigator
 | Max items per section | 数字（不小于 1） | 6 |
 | Show a children index in the note body | 开关 | 开启 |
 | Show a create button in the body index | 开关 | 开启 |
-| Create a FolderNote with a new folder | 开关 | 开启 |
 
 关闭新建按钮后，插件变为严格只读。在某篇笔记的 frontmatter 中加入 `hierarchy-nav: hide` 可以单独跳过该笔记。点击导航块顶部的标题栏可以折叠整个区块，这个折叠状态会在切换笔记后保留。
 
@@ -125,14 +126,14 @@ npm run dev      # 监听 src/ 目录，每次改动重新构建 main.js
 3. 创建与 manifest 版本完全相同的标签（不带 `v`），例如：
 
 ```bash
-git tag -a 0.3.3 -m "0.3.3"
-git push origin 0.3.3
+git tag -a 0.3.4 -m "0.3.4"
+git push origin 0.3.4
 ```
 
 4. 等待 **Actions → Release Obsidian plugin** 成功。它会创建草稿 Release，并上传 `main.js`、`manifest.json`、`styles.css` 和 `hierarchy-navigator-x.y.z.zip`。
 5. 核对附件和发布说明，然后选择 **Publish release**。草稿尚不能作为公开安装来源。
 
-上面的 `0.3.3` 仅为下一版本示例，必须替换成 manifest 中的实际版本。插件已上架社区插件市场，发布新版本后还需要在 [obsidianmd/obsidian-releases](https://github.com/obsidianmd/obsidian-releases) 更新 `community-plugins.json` 中的版本号，市场才会同步该版本；商店页面的说明文字来自本仓库的 `README.md`。
+上面的 `0.3.4` 仅为下一版本示例，必须替换成 manifest 中的实际版本。插件已上架社区插件市场，发布新版本后还需要在 [obsidianmd/obsidian-releases](https://github.com/obsidianmd/obsidian-releases) 更新 `community-plugins.json` 中的版本号，市场才会同步该版本；商店页面的说明文字来自本仓库的 `README.md`。
 
 ## License
 

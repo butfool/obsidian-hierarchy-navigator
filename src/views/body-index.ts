@@ -55,14 +55,16 @@ export function isRawBodyEmpty(text: string): boolean {
 function makeCreateButton(
   plugin: HierarchyNavigator,
   folder: TFolder,
+  empty = false,
 ): HTMLElement {
   const t = getStrings(plugin.settings.language);
+  const label = empty ? t.createChildAction : t.createAction;
   const button = el("button", {
     cls: "hn-index-new",
-    attr: { type: "button", "aria-label": t.createAction, title: t.createAction },
+    attr: { type: "button", "aria-label": label, title: label },
     children: [
       Icons.plus(),
-      el("span", { cls: "hn-index-new-label", text: t.createAction }),
+      el("span", { cls: "hn-index-new-label", text: label }),
     ],
   });
   button.addEventListener("click", (ev) => {
@@ -90,12 +92,18 @@ export function renderBodyIndex(
   const folders = items.filter((i) => i instanceof TFolder).length;
   const files = items.length - folders;
   const inner = el("div", { cls: "hn-index-inner" });
+  if (items.length === 0) {
+    root.classList.add("hn-index-empty");
+    inner.appendChild(makeCreateButton(plugin, folder, true));
+    root.appendChild(inner);
+    return root;
+  }
   const head = el("div", { cls: "hn-index-head" });
   head.appendChild(Icons.grid());
   head.appendChild(el("span", { cls: "hn-index-title", text: t.bodyIndexTitle }));
   head.appendChild(el("span", {
     cls: "hn-index-count",
-    text: items.length === 0 ? t.bodyIndexNothing : t.bodyIndexCounts(folders, files),
+    text: t.bodyIndexCounts(folders, files),
   }));
 
   if (plugin.settings.enableCreate) {

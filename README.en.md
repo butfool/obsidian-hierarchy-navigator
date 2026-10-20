@@ -10,7 +10,7 @@
   <strong>English</strong>
 </p>
 
-[![Version](https://img.shields.io/badge/Version-0.3.3-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
+[![Version](https://img.shields.io/badge/Version-0.3.4-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
 [![Community plugins](https://img.shields.io/obsidian/plugins?id=hierarchy-navigator&label=Community%20plugins&logo=obsidian&logoColor=white)](https://obsidian.md/plugins?id=hierarchy-navigator)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.13.0%2B-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md)
 [![License](https://img.shields.io/badge/License-MIT-3DA639?logo=opensourceinitiative&logoColor=white)](LICENSE)
@@ -39,7 +39,9 @@ Inspired by SiYuan's [`hierarchyNavigate`](https://github.com/OpaqueGlass/syplug
 - Sorts folders before files in natural order, so `9` comes before `10`
 - Uses consistently sized navigation pills for folders and notes; Folder Notes have an accent-colored icon
 - Tints each pill by file type: note, Canvas, Base, PDF, image, audio, video, code
-- Renders a children index inside the note body while a Folder Note is still empty, with a button to create notes and folders there
+- Renders a children index while a Folder Note's body is empty; when there are no children, only a compact “New child item” action appears
+- The create dialog offers Note / Folder note / Folder with icons in a segmented selector, defaults to Folder note, preserves the name across type changes, and previews the resulting directory structure; its height stays fixed across types and fits smaller screens
+- Notes open after creation; Folder notes create a folder and its same-named entry note, then open that note; empty folders refresh the index
 - Creates notes through Obsidian's own `createNewMarkdownFile`, never overwriting an existing path
 - Ships English and 简体中文; switch under Settings and it applies immediately
 
@@ -58,7 +60,7 @@ Store page: <https://obsidian.md/plugins?id=hierarchy-navigator>
 
 ### Manual install
 
-1. Open [Releases](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest) and download `hierarchy-navigator-x.y.z.zip` (for example, `hierarchy-navigator-0.3.3.zip`). Do not download the Source code archives.
+1. Open [Releases](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest) and download `hierarchy-navigator-x.y.z.zip` (for example, `hierarchy-navigator-0.3.4.zip`). Do not download the Source code archives.
 2. Extract the ZIP and place the entire `hierarchy-navigator` folder in `YOUR_VAULT/.obsidian/plugins/`.
 3. Enable **Hierarchy Navigator** under **Settings → Community plugins → Installed plugins**.
 
@@ -88,7 +90,6 @@ https://github.com/butfool/obsidian-hierarchy-navigator
 | Max items per section | number ≥ 1 | 6 |
 | Show a children index in the note body | toggle | on |
 | Show a create button in the body index | toggle | on |
-| Create a FolderNote with a new folder | toggle | on |
 
 Turn off the create button and the plugin becomes strictly read-only. Add `hierarchy-nav: hide` to a note's frontmatter to skip that one note. Clicking the header row folds the whole block away, and the folded state survives switching notes.
 
@@ -121,14 +122,14 @@ The `.github/workflows/release.yml` workflow builds only the committed source at
 3. Create and push a tag that exactly matches the manifest version, without a `v` prefix:
 
 ```bash
-git tag -a 0.3.3 -m "0.3.3"
-git push origin 0.3.3
+git tag -a 0.3.4 -m "0.3.4"
+git push origin 0.3.4
 ```
 
 4. Wait for **Actions → Release Obsidian plugin** to succeed. It creates a draft release with `main.js`, `manifest.json`, `styles.css`, and `hierarchy-navigator-x.y.z.zip` attached.
 5. Check the assets and release notes, then select **Publish release**. Draft releases are not public installation sources.
 
-The `0.3.3` tag above is only a next-version example; replace it with the actual manifest version. The plugin is on the community plugin store: after publishing a new release, bump its version in `community-plugins.json` of [obsidianmd/obsidian-releases](https://github.com/obsidianmd/obsidian-releases) so the store picks up that version. The store listing renders this repository's `README.md`.
+The `0.3.4` tag above is only a next-version example; replace it with the actual manifest version. The plugin is on the community plugin store: after publishing a new release, bump its version in `community-plugins.json` of [obsidianmd/obsidian-releases](https://github.com/obsidianmd/obsidian-releases) so the store picks up that version. The store listing renders this repository's `README.md`.
 
 ## License
 

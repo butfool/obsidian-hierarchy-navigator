@@ -7,14 +7,12 @@ import type HierarchyNavigator from "./main";
    ──────────────────────────────────────────────── */
 
 /** What the create dialog was asked to make. */
-export type CreateKind = "note" | "folder";
+export type CreateKind = "note" | "folder-note" | "folder";
 
 export interface CreateRequest {
   kind: CreateKind;
   /** Raw text from the name field. Normalised here, not by the caller. */
   name: string;
-  /** Folder only: also drop `<folder>/<folder>.md` beside it. */
-  folderNote: boolean;
   /** Only retry Folder Note creation for a folder created in this dialog. */
   retryPartialFolder?: TFolder;
 }
@@ -51,7 +49,7 @@ export function normalizeName(kind: CreateKind, raw: string): string {
   const name = raw.trim();
   // "Foo.md" and "Foo .md" both mean the note "Foo" — the extension is a
   // hint at what you are making, not part of its name.
-  return kind === "note" ? name.replace(/\s*\.md$/i, "") : name;
+  return kind !== "folder" ? name.replace(/\s*\.md$/i, "") : name;
 }
 
 /** Empty, "." / "..", or holding something a path cannot. */
@@ -114,8 +112,7 @@ export async function createChild(
     // its Folder Note. Treat that state as a repair operation instead of
     // making the user rename an otherwise valid folder.
     if (
-      request.kind === "folder" &&
-      request.folderNote &&
+      request.kind === "folder-note" &&
       request.retryPartialFolder?.path === existing.path &&
       existing instanceof TFolder &&
       !vault.getAbstractFileByPath(`${path}/${name}.md`)
@@ -138,7 +135,7 @@ export async function createChild(
 
     const folder = await vault.createFolder(path);
     let folderNote: TFile | null = null;
-    if (request.folderNote) {
+    if (request.kind === "folder-note") {
       const notePath = `${path}/${name}.md`;
       if (!vault.getAbstractFileByPath(notePath)) {
         try {
