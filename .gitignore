@@ -6,9 +6,6 @@ main.js
 data.json
 *.tsbuildinfo
 
-# 本地发布打包
-hierarchy-navigator-*.zip
-
 # 本地工具目录
 .pi/
 .archify/

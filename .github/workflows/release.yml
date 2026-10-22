@@ -38,36 +38,26 @@ jobs:
           import fs from "node:fs";
           const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
           const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const versions = JSON.parse(fs.readFileSync("versions.json", "utf8"));
           assert.match(manifest.version, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/);
           assert.equal(process.env.RELEASE_TAG, manifest.version, "Tag must match manifest.version without a v prefix");
           assert.equal(pkg.version, manifest.version, "package.json and manifest.json versions must match");
+          assert.equal(versions[manifest.version], manifest.minAppVersion, "versions.json must map this release to minAppVersion");
           JS
 
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Check plugin
+        run: npm run check
+
       - name: Build release assets
         run: |
-          npm exec -- tsc --noEmit
           npm run build
           node --check main.js
           test -s main.js
           test -s manifest.json
           test -s styles.css
-
-      - name: Package manual installation ZIP
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          package_dir="$RUNNER_TEMP/plugin-package"
-          mkdir -p "$package_dir/hierarchy-navigator"
-          cp main.js manifest.json styles.css "$package_dir/hierarchy-navigator/"
-          cd "$package_dir"
-          zip -X "$GITHUB_WORKSPACE/hierarchy-navigator-${RELEASE_TAG}.zip" \
-            hierarchy-navigator/main.js \
-            hierarchy-navigator/manifest.json \
-            hierarchy-navigator/styles.css
-          unzip -t "$GITHUB_WORKSPACE/hierarchy-navigator-${RELEASE_TAG}.zip"
 
       - name: Attest release assets
         uses: actions/attest@v4
@@ -76,7 +66,6 @@ jobs:
             main.js
             manifest.json
             styles.css
-            hierarchy-navigator-*.zip
 
       - name: Create draft release
         env:
@@ -89,4 +78,4 @@ jobs:
             --title "Hierarchy Navigator $RELEASE_TAG" \
             --generate-notes \
             --draft \
-            main.js manifest.json styles.css "hierarchy-navigator-${RELEASE_TAG}.zip"
+            main.js manifest.json styles.css

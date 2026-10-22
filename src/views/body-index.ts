@@ -5,7 +5,6 @@ import { getStrings, type Strings } from "../i18n";
 import { promptCreateChild } from "../createModal";
 import { el } from "../ui/dom";
 import { openTarget } from "../ui/navigation";
-import type { Entry } from "../hierarchy";
 import {
   ROOT,
   findFolderNoteFile,

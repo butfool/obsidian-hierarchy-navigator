@@ -2,12 +2,12 @@
 
 <h1>Hierarchy Navigator</h1>
 
-<p><strong>在每篇笔记顶部渲染「父级 / 兄弟 / 子级」导航块的 Obsidian 插件</strong></p>
-<p>需要 Obsidian 1.13.0 或更高版本</p>
+<p><strong>A parent / siblings / children navigation block for every Obsidian note</strong></p>
+<p>Requires Obsidian 1.13.0 or later</p>
 
 <p>
-  <strong>简体中文</strong> |
-  <a href="README.en.md">English</a>
+  <a href="README.zh-CN.md">简体中文</a> |
+  <strong>English</strong>
 </p>
 
 [![Version](https://img.shields.io/badge/Version-0.3.4-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
@@ -25,54 +25,50 @@
 
 ## What is this
 
-Hierarchy Navigator 在每篇笔记的顶部渲染一个导航块，说明这篇笔记在文件夹树中的位置：父级在哪里、旁边有哪些同级项、自己里面装着什么。打开任意一篇笔记，不切换到文件浏览器就能看到它的父级、兄弟与子项。
+Hierarchy Navigator renders a navigation block at the top of every note in your vault, telling you where that note sits in the folder tree: which folder holds it, what else lives beside it, and what is inside it. Open any note and you see its parent, its siblings, and its children without switching to the file explorer.
 
-导航块在渲染时注入到笔记视图，阅读视图与 Live Preview 下表现一致。你的 `.md` 文件不会被改写；插件只在你明确要求新建笔记或文件夹时才写盘。
+The header block is injected at render time in Reading view and Live Preview. The body children index is shown only in Reading view. Your `.md` files are never rewritten — the plugin writes to disk only when you explicitly ask it to create something.
 
-思路来自思源笔记的 [`hierarchyNavigate`](https://github.com/OpaqueGlass/syplugin-hierarchyNavigate)，并遵循 [AidenLx's Folder Note](https://github.com/aidenlx/alx-folder-note) 的语义实现。
-
-### English description
-
-Hierarchy Navigator renders a parent / siblings / children navigation block at the top of every Obsidian note. It works with Folder Note, uses Obsidian's view registry to filter openable files, and never rewrites note source files. The plugin also provides an optional children index and explicit create actions for empty Folder Notes.
+Inspired by SiYuan's [`hierarchyNavigate`](https://github.com/OpaqueGlass/syplugin-hierarchyNavigate) and built on [AidenLx's Folder Note](https://github.com/aidenlx/alx-folder-note) semantics.
 
 ## Features
 
-- 阅读视图与 Live Preview 下渲染同一个顶部导航块；正文子项索引只在阅读视图显示
-- 配合 Folder Note 工作，Folder Note 会以它所代表的文件夹参与导航
-- 依据 Obsidian 自己的视图注册表过滤扩展名，只显示能被打开的文件
-- 区块内文件夹排在文件前面，按自然顺序排列，`9` 排在 `10` 之前
-- 文件夹与笔记使用统一尺寸的导航胶囊；Folder Note 通过蓝色图标区分
-- 每个条目按文件类型着色区分：笔记、Canvas、Base、PDF、图片、音频、视频、代码
-- Folder Note 正文为空时，在正文区渲染子项索引；没有子项时只显示轻量的「新建子项」入口
-- 创建弹窗提供带图标的「普通笔记 / 文件夹笔记 / 文件夹」三段式选择器，默认选择文件夹笔记；切换类型保留名称，实时预览目录结构，弹窗高度保持固定并适配小屏幕
-- 普通笔记创建后直接打开；文件夹笔记创建同名文件夹及入口笔记并打开入口；空文件夹创建后刷新列表
-- 新建操作走 Obsidian 自身的 `createNewMarkdownFile`，不会覆盖已存在的路径
-- 界面提供 English 与 简体中文，在设置中切换后立即生效，无需重载
+- Renders the same header navigation block in Reading view and Live Preview; the body children index appears only in Reading view
+- Works with Folder Note, so a Folder Note navigates as the folder it represents
+- Filters extensions through Obsidian's own view registry, showing only files the app can open
+- Sorts folders before files in natural order, so `9` comes before `10`
+- Uses consistently sized navigation pills for folders and notes; Folder Notes have an accent-colored icon
+- Tints each pill by file type: note, Canvas, Base, PDF, image, audio, video, code
+- Renders a children index while a Folder Note's body is empty; when there are no children, only a compact “New child item” action appears
+- The create dialog offers Note / Folder note / Folder with icons in a segmented selector, defaults to Folder note, preserves the name across type changes, and previews the resulting directory structure; its height stays fixed across types and fits smaller screens
+- Notes open after creation; Folder notes create a folder and its same-named entry note, then open that note; empty folders refresh the index
+- Creates notes through Obsidian's own `createNewMarkdownFile`, never overwriting an existing path
+- Ships English and 简体中文; switch under Settings and it applies immediately
 
 ## Install
 
-插件已经上架社区插件市场。
+The plugin is on the community plugin store.
 
-### 社区插件市场（推荐）
+### Community plugin store (recommended)
 
-1. 在 Obsidian 中打开 **Settings → Community plugins**，点击 **Browse**，搜索 `Hierarchy Navigator`。
-2. 点击 **Install**，然后在 **Installed plugins** 中启用 **Hierarchy Navigator**。
+1. Open **Settings → Community plugins** in Obsidian, click **Browse**, and search for `Hierarchy Navigator`.
+2. Click **Install**, then enable **Hierarchy Navigator** under **Installed plugins**.
 
-也可以直接点击下面的链接安装：[obsidian://show-plugin?id=hierarchy-navigator](obsidian://show-plugin?id=hierarchy-navigator)
+You can also install it with this link: [obsidian://show-plugin?id=hierarchy-navigator](obsidian://show-plugin?id=hierarchy-navigator)
 
-插件市场页面：<https://obsidian.md/plugins?id=hierarchy-navigator>
+Store page: <https://obsidian.md/plugins?id=hierarchy-navigator>
 
-### 手动安装
+### Manual install
 
-1. 打开 [Releases](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)，下载 `hierarchy-navigator-x.y.z.zip` 安装包（例如 `hierarchy-navigator-0.3.4.zip`），不要下载 Source code 压缩包。
-2. 解压后，将整个 `hierarchy-navigator` 文件夹放到 `YOUR_VAULT/.obsidian/plugins/` 下。
-3. 在 **Settings → Community plugins → Installed plugins** 中启用 **Hierarchy Navigator**。
+1. Open [Releases](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest) and download `main.js`, `manifest.json`, and `styles.css` from the same release.
+2. Create `YOUR_VAULT/.obsidian/plugins/hierarchy-navigator/` and place all three files in it.
+3. Enable **Hierarchy Navigator** under **Settings → Community plugins → Installed plugins**.
 
-也可以单独下载同一版本的 `main.js`、`manifest.json` 和 `styles.css`，放到 `YOUR_VAULT/.obsidian/plugins/hierarchy-navigator/`。安装 ZIP 内包含相同的三个文件；社区插件安装器仍使用三个独立附件。普通用户无需安装 Node.js 或自行构建。
+The community plugin installer uses these three individual release assets. Users do not need Node.js or a local build.
 
-### BRAT 预览版
+### BRAT preview
 
-在 BRAT 的插件列表中添加仓库地址：
+Add the repository to your BRAT plugin list:
 
 ```
 https://github.com/butfool/obsidian-hierarchy-navigator
@@ -80,31 +76,31 @@ https://github.com/butfool/obsidian-hierarchy-navigator
 
 ## Settings
 
-**Settings → Hierarchy Navigator** 中可配置：
+**Settings → Hierarchy Navigator** controls:
 
-| 配置项 | 可选值 | 默认值 |
+| Setting | Options | Default |
 |---|---|---|
 | Language | English / 简体中文 | 简体中文 |
-| Header label | 自由文本 | `Hierarchy` |
-| Show parent folder | 开关 | 开启 |
-| Show siblings | 开关 | 关闭 |
-| Show folders | 开关 | 开启 |
-| Show files | 开关 | 开启 |
+| Header label | free text | `Hierarchy` |
+| Show parent folder | toggle | on |
+| Show siblings | toggle | off |
+| Show folders | toggle | on |
+| Show files | toggle | on |
 | Section layout | Single line / Wrap | Single line |
-| Max items per section | 数字（不小于 1） | 6 |
-| Show a children index in the note body | 开关 | 开启 |
-| Show a create button in the body index | 开关 | 开启 |
+| Max items per section | number ≥ 1 | 6 |
+| Show a children index in the note body | toggle | on |
+| Show a create button in the body index | toggle | on |
 
-关闭新建按钮后，插件变为严格只读。在某篇笔记的 frontmatter 中加入 `hierarchy-nav: hide` 可以单独跳过该笔记。点击导航块顶部的标题栏可以折叠整个区块，这个折叠状态会在切换笔记后保留。
+Turn off the create button and the plugin becomes strictly read-only. Add `hierarchy-nav: hide` to a note's frontmatter to skip that one note. Clicking the header row folds the whole block away, and the folded state survives switching notes.
 
 ## Commands
 
-在 **Settings → Hotkeys** 中为以下命令分配快捷键，命令名称跟随插件的界面语言。
+Assign shortcuts under **Settings → Hotkeys**. Command names follow the plugin's interface language.
 
-| 命令 | 作用 |
+| Command | What it does |
 |---|---|
-| 在文件浏览器中定位父文件夹 | 在文件浏览器中选中父级文件夹 |
-| 打开第一个子文件 | 打开当前 Folder Note 下按导航规则排序后的第一个条目 |
+| 在文件浏览器中定位父文件夹 | Selects the parent folder in the file explorer |
+| 打开第一个子文件 | Opens the first entry under the current Folder Note using the same navigation ordering |
 
 ## Development
 
@@ -112,33 +108,33 @@ https://github.com/butfool/obsidian-hierarchy-navigator
 git clone https://github.com/butfool/obsidian-hierarchy-navigator.git
 cd obsidian-hierarchy-navigator
 npm install
-npm run dev      # 监听 src/ 目录，每次改动重新构建 main.js
+npm run dev      # watches src/ and rebuilds main.js on every change
 ```
 
-开发时把仓库放在 vault 的 `.obsidian/plugins/hierarchy-navigator/` 下，每次构建完成后重载 Obsidian 即可看到效果。
+Keep the repository at `YOUR_VAULT/.obsidian/plugins/hierarchy-navigator/` while developing, then reload Obsidian after each build.
 
 ## Releasing
 
-发布工作流位于 `.github/workflows/release.yml`。它只构建标签对应的已提交代码，使用锁文件安装依赖，校验标签与版本一致，额外打包带 `hierarchy-navigator/` 目录的安装 ZIP，并为三个标准附件和 ZIP 生成构建来源证明。
+The `.github/workflows/release.yml` workflow builds only the committed source at the pushed tag. It installs locked dependencies, validates the version, runs the checks, and generates build provenance attestations for the three standard assets.
 
-1. 将 `manifest.json`、`package.json` 和 `package-lock.json` 中的版本统一为新的 `x.y.z`，同步 README 版本徽章。若提高 `minAppVersion`，按需在 [obsidianmd/obsidian-releases](https://github.com/obsidianmd/obsidian-releases) 的 `versions.json` 中维护旧版本映射。
-2. 完成验证并提交、推送本次发布的全部目标改动。不要从含未提交源码的工作区构建发布附件。
-3. 创建与 manifest 版本完全相同的标签（不带 `v`），例如：
+1. Set the same new `x.y.z` version in `manifest.json`, `package.json`, and `package-lock.json`, update `versions.json`, and update the README version badges. If `minAppVersion` increases, add a compatible version mapping to `versions.json`.
+2. Verify, commit, and push all intended release changes. Never upload a build containing uncommitted source.
+3. Create and push a tag that exactly matches the manifest version, without a `v` prefix:
 
 ```bash
 git tag -a 0.3.4 -m "0.3.4"
 git push origin 0.3.4
 ```
 
-4. 等待 **Actions → Release Obsidian plugin** 成功。它会创建草稿 Release，并上传 `main.js`、`manifest.json`、`styles.css` 和 `hierarchy-navigator-x.y.z.zip`。
-5. 核对附件和发布说明，然后选择 **Publish release**。草稿尚不能作为公开安装来源。
+4. Wait for **Actions → Release Obsidian plugin** to succeed. It creates a draft release with `main.js`, `manifest.json`, and `styles.css` attached.
+5. Check the assets and release notes, then select **Publish release**. Draft releases are not public installation sources.
 
-上面的 `0.3.4` 仅为下一版本示例，必须替换成 manifest 中的实际版本。插件已上架社区插件市场，发布新版本后还需要在 [obsidianmd/obsidian-releases](https://github.com/obsidianmd/obsidian-releases) 更新 `community-plugins.json` 中的版本号，市场才会同步该版本；商店页面的说明文字来自本仓库的 `README.md`。
+The `0.3.4` tag above is only a next-version example; replace it with the actual manifest version. New releases are reviewed automatically by the Obsidian Community directory. The store listing renders this repository's `README.md`.
 
 ## License
 
 [MIT](LICENSE) © 2026 butcool
 
-## 友链
+## Friend links
 
 [Linux Do](https://linux.do)

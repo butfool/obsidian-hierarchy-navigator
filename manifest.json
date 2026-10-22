@@ -5,7 +5,5 @@
   "minAppVersion": "1.13.0",
   "description": "Render a parent / siblings / children navigation block at the top of any note. Inspired by SiYuan's hierarchyNavigate plugin. Source files are never modified — the block is injected at render time. Works with the AidenLX Folder Note plugin.",
   "author": "butcool",
-  "authorUrl": "",
-  "fundingUrl": "",
   "isDesktopOnly": false
 }

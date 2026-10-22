@@ -6,8 +6,8 @@ import {
   WorkspaceLeaf,
   type Command,
 } from "obsidian";
+import { parseSettings } from "./settings";
 import {
-  DEFAULT_SETTINGS,
   HierarchyNavigatorSettings,
   AnyApp,
   HierarchyNavigatorPlugin,
@@ -206,7 +206,8 @@ export default class HierarchyNavigator
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const data: unknown = await this.loadData();
+    this.settings = parseSettings(data);
   }
 
   async saveSettings(): Promise<void> {
