@@ -10,7 +10,7 @@
   <strong>English</strong>
 </p>
 
-[![Version](https://img.shields.io/badge/Version-0.3.4-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
+[![Version](https://img.shields.io/badge/Version-0.3.5-3DA639)](https://github.com/butfool/obsidian-hierarchy-navigator/releases/latest)
 [![Community plugins](https://img.shields.io/obsidian/plugins?id=hierarchy-navigator&label=Community%20plugins&logo=obsidian&logoColor=white)](https://obsidian.md/plugins?id=hierarchy-navigator)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.13.0%2B-7C3AED?logo=obsidian&logoColor=white)](https://obsidian.md)
 [![License](https://img.shields.io/badge/License-MIT-3DA639?logo=opensourceinitiative&logoColor=white)](LICENSE)
