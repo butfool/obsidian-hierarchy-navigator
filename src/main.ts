@@ -28,9 +28,20 @@ import { getChildrenForFile, isEligible } from "./hierarchy";
 
 
 interface MountState {
+  file: TFile;
+  block: HTMLElement | null;
   frameId: number | null;
+  reanchorFrameId: number | null;
+  settleTimer: number | null;
   titleRetryUsed: boolean;
   disposed: boolean;
+  unwatchScroll: (() => void) | null;
+}
+
+interface Anchor {
+  parent: HTMLElement;
+  ref: HTMLElement;
+  before: boolean;
 }
 
 export default class HierarchyNavigator
@@ -251,11 +262,11 @@ export default class HierarchyNavigator
   /**
    * Mount (or refresh) the block in the given leaf's markdown view.
    *
-   * `titleRetryUsed` marks the second attempt of a mount whose view had no title yet:
-   * the title is rendered asynchronously on first open, so the first attempt
-   * waits one frame for it, and the second takes the title-less insertion
-   * point rather than waiting again. Without that ceiling, a view that never
-   * renders a title would rebuild its block once per frame, forever.
+   * `titleRetryUsed` marks the second attempt of a mount that had no resolvable
+   * insertion point yet: the title is rendered asynchronously on first open, so
+   * the first attempt waits one frame for it, and the second places the block in
+   * the note header. Without that ceiling, a view that never renders a title
+   * would rebuild its block once per frame, forever.
    */
   private mountInto(leaf: WorkspaceLeaf, existing?: MountState): void {
     const view = leaf.view;
@@ -264,8 +275,15 @@ export default class HierarchyNavigator
     const file = view.file;
     if (!(file instanceof TFile)) return;
 
-    const state = existing ?? this.beginMount(view);
+    const current = existing ?? this.mounts.get(view);
+    const state = current && current.file === file
+      ? current
+      : this.beginMount(view, file);
     if (!this.isCurrentMount(view, state)) return;
+    if (existing === undefined && state.frameId !== null) {
+      window.cancelAnimationFrame(state.frameId);
+      state.frameId = null;
+    }
 
     // Eligibility check first — if the note opted out, *remove* any
     // stale block from a previous mount.
@@ -274,106 +292,214 @@ export default class HierarchyNavigator
       return;
     }
 
-    const block = renderHierarchyBlock(this, file);
+    // Reuse the tracked node on a retry. Every other mount rebuilds the
+    // content but keeps the node's document position.
+    const previous = state.block;
+    const block = previous !== null && existing !== undefined
+      ? previous
+      : renderHierarchyBlock(this, file);
+    state.block = block;
 
-    // The block sits directly below the note's large title, not above it.
-    // Prefer the rendered H1, then Obsidian's inline-title fallback. This
-    // keeps the hierarchy chrome attached to the document title while leaving
-    // Properties and the body in their natural order.
-    //
-    // Returns false only when nothing was placed because the title has not
-    // rendered yet; the caller then retries on the next frame.
-    const placeChrome = (): boolean => {
-      const title = Array.from(
-        view.contentEl.querySelectorAll<HTMLElement>(".inline-title, :scope h1"),
-      ).find((node) => !node.closest(".markdown-embed, .internal-embed"));
-      if (title) {
-        // Properties sit in the document flow in both reading and editing
-        // (Live Preview / Source) views: place the block just above them,
-        // which keeps the order title → navigation → properties → body.
-        const metadata = Array.from(
-          view.contentEl.querySelectorAll<HTMLElement>(PROPERTIES_SELECTOR),
-        ).find((node) => !node.closest(".markdown-embed, .internal-embed"));
-        const metadataParent = metadata?.parentElement;
-        if (metadata && metadataParent) {
-          metadataParent.insertBefore(block, metadata);
-          return true;
-        }
-
-        // Editor without properties: sit directly before the editable
-        // content inside the editor sizer.
-        const sizer = title.closest<HTMLElement>(".cm-sizer");
-        const cmContent = sizer?.querySelector<HTMLElement>(
-          ":scope > .cm-contentContainer",
-        );
-        if (sizer && cmContent) {
-          sizer.insertBefore(block, cmContent);
-          return true;
-        }
-
-        // Reading view without properties: after the title's top-level row.
-        // In some themes the title is inside a horizontal grid/flex row;
-        // inserting beside the title node would put Hierarchy in the row's
-        // right column, so walk up to the row first.
-        const contentRoot =
-          title.closest<HTMLElement>(".markdown-preview-sizer") ??
-          view.contentEl;
-        let titleRow = title;
-        while (titleRow.parentElement && titleRow.parentElement !== contentRoot) {
-          titleRow = titleRow.parentElement;
-        }
-        titleRow.insertAdjacentElement("afterend", block);
-        return true;
-      }
-
+    const placed = this.placeChrome(view, block, previous);
+    if (!placed && previous === null && !state.titleRetryUsed) {
       // The title is rendered asynchronously on first open. Give Obsidian one
-      // frame to add it before choosing a fallback insertion point.
-      if (!state.titleRetryUsed) {
-        state.titleRetryUsed = true;
-        state.frameId = window.requestAnimationFrame(() => {
-          state.frameId = null;
-          if (view.file === file && this.isCurrentMount(view, state)) {
-            this.mountInto(leaf, state);
-          }
-        });
-        return false;
-      }
-
-      // Some themes hide the inline title entirely. Keep the navigation
-      // before Properties (or before the editor content) without putting it
-      // ahead of a title rendered later in the same view.
-      const fallbackSizer = view.contentEl.querySelector<HTMLElement>(".cm-sizer");
-      const fallbackContent = fallbackSizer?.querySelector<HTMLElement>(
-        ":scope > .cm-contentContainer",
-      );
-      if (fallbackSizer && fallbackContent) {
-        fallbackSizer.insertBefore(block, fallbackContent);
-        return true;
-      }
-      const contentRoot =
-        view.contentEl.querySelector<HTMLElement>(".markdown-preview-sizer") ??
-        view.contentEl;
-      const firstContent = contentRoot.querySelector<HTMLElement>(
-        ":scope > :not(.hn-root):not(.hn-index)",
-      );
-      if (firstContent) {
-        contentRoot.insertBefore(block, firstContent);
-      } else {
-        contentRoot.appendChild(block);
-      }
-      return true;
-    };
-
-    if (!placeChrome()) {
-      // The block already owns document-level listeners even though it has
-      // not been inserted. Release them before the title retry.
-      destroyOwnedElement(block);
+      // frame to add it before placing the block in the note header.
+      state.titleRetryUsed = true;
+      state.frameId = window.requestAnimationFrame(() => {
+        state.frameId = null;
+        if (view.file === file && this.isCurrentMount(view, state)) {
+          this.mountInto(leaf, state);
+        }
+      });
       return;
     }
+    if (!placed) this.placeInHeader(view, block);
+
+    if (previous && previous !== block) {
+      destroyOwnedElement(previous);
+      previous.remove();
+    }
+    // A stale copy can come back with the note header when Obsidian reattaches
+    // the detached title subtree; keep exactly one block per view.
+    view.contentEl.querySelectorAll<HTMLElement>(`.${BLOCK_CLASS}`).forEach((node) => {
+      if (node === block) return;
+      destroyOwnedElement(node);
+      node.remove();
+    });
+
+    this.watchScroll(view, state);
+    this.settle(view, state);
 
     // The index is a node in the note, placed directly under the header rail
     // by `attachBodyIndex`: it scrolls with the text like any other block.
     this.mountBodyIndex(view, file, state);
+  }
+
+  /**
+   * Put the block where the note shows its title: above Properties when the
+   * note has them, otherwise directly before the editable content or after the
+   * reading view's title row.
+   *
+   * Returns false when the title area is not in the view. Reading mode unloads
+   * the sections above the viewport, so a note scrolled down has body headings
+   * rendered while the title subtree is detached. `previous` then carries the
+   * position: the block is restored inside that detached subtree and returns
+   * together with it.
+   */
+  private placeChrome(
+    view: MarkdownView,
+    block: HTMLElement,
+    previous: HTMLElement | null,
+  ): boolean {
+    const anchor = this.resolveAnchor(view);
+    if (anchor) {
+      if (anchor.before) anchor.parent.insertBefore(block, anchor.ref);
+      else anchor.ref.insertAdjacentElement("afterend", block);
+      return true;
+    }
+    if (previous?.parentElement) {
+      previous.parentElement.insertBefore(block, previous);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Resolve the insertion point for the block.
+   *
+   * The note title is `.inline-title` and nothing else. Body `h1` headings are
+   * content: anchoring to them put the block under whichever heading happened
+   * to be rendered after the title scrolled out of the reading view.
+   */
+  private resolveAnchor(view: MarkdownView): Anchor | null {
+    const host = this.activeRoot(view);
+    const outsideEmbeds = (node: HTMLElement) =>
+      !node.closest(".markdown-embed, .internal-embed");
+
+    // Properties sit in the document flow in both reading and editing
+    // (Live Preview / Source) views: placing the block just above them keeps
+    // the order title → navigation → properties → body.
+    const metadata = Array.from(
+      host.querySelectorAll<HTMLElement>(PROPERTIES_SELECTOR),
+    ).find(outsideEmbeds);
+    if (metadata?.parentElement) {
+      return { parent: metadata.parentElement, ref: metadata, before: true };
+    }
+
+    // Editor without properties: sit directly before the editable content
+    // inside the editor sizer.
+    const sizer = host.querySelector<HTMLElement>(".cm-sizer");
+    const cmContent = sizer?.querySelector<HTMLElement>(
+      ":scope > .cm-contentContainer",
+    );
+    if (sizer && cmContent) {
+      return { parent: sizer, ref: cmContent, before: true };
+    }
+
+    // Reading view without properties: after the title's top-level row.
+    // In some themes the title is inside a horizontal grid/flex row;
+    // inserting beside the title node would put Hierarchy in the row's right
+    // column, so walk up to the row first.
+    const title = Array.from(
+      host.querySelectorAll<HTMLElement>(".inline-title"),
+    ).find(outsideEmbeds);
+    if (!title) return null;
+    const contentRoot =
+      title.closest<HTMLElement>(".markdown-preview-sizer") ?? host;
+    let titleRow = title;
+    while (titleRow.parentElement && titleRow.parentElement !== contentRoot) {
+      titleRow = titleRow.parentElement;
+    }
+    return { parent: contentRoot, ref: titleRow, before: false };
+  }
+
+  /**
+   * Reading mode with neither a title nor Properties rendered: the block still
+   * belongs above the text, inside the header Obsidian renders with the note.
+   * When the header itself is unloaded because the note is scrolled past it,
+   * the block stays out of the document and the scroll watcher anchors it once
+   * the header is rendered again.
+   */
+  private placeInHeader(view: MarkdownView, block: HTMLElement): void {
+    const header = this.activeRoot(view).querySelector<HTMLElement>(
+      ".mod-header",
+    );
+    if (header) header.insertBefore(block, header.firstElementChild);
+  }
+
+  /**
+   * The container of what the user is looking at. A markdown leaf keeps both
+   * its reading view and its (hidden) source view in the DOM, so a query
+   * across `contentEl` would anchor to the mode that is not on screen.
+   */
+  private activeRoot(view: MarkdownView): HTMLElement {
+    const preview = view.contentEl.querySelector<HTMLElement>(".markdown-reading-view");
+    const source = view.contentEl.querySelector<HTMLElement>(".markdown-source-view");
+    const primary = view.getMode() === "preview" ? preview : source;
+    const secondary = primary === preview ? source : preview;
+    if (primary && primary.getClientRects().length > 0) return primary;
+    if (secondary && secondary.getClientRects().length > 0) return secondary;
+    return primary ?? secondary ?? view.contentEl;
+  }
+
+  private isAtAnchor(block: HTMLElement, anchor: Anchor): boolean {
+    if (block.parentElement !== anchor.parent) return false;
+    return anchor.before
+      ? block.nextElementSibling === anchor.ref
+      : block.previousElementSibling === anchor.ref;
+  }
+
+  /**
+   * Re-anchor the block when the document around it settles.
+   *
+   * Obsidian renders parts of the view asynchronously: the note title on first
+   * open, Properties after a mode switch, and the sections above the reading
+   * viewport while scrolling. A block placed before those exist would stay in
+   * the wrong spot, so scrolling and a short delay after each mount re-check
+   * the anchor.
+   */
+  private watchScroll(view: MarkdownView, state: MountState): void {
+    if (state.unwatchScroll) return;
+    const onScroll = () => this.requestReanchor(view);
+    view.contentEl.addEventListener("scroll", onScroll, {
+      capture: true,
+      passive: true,
+    });
+    state.unwatchScroll = () => {
+      view.contentEl.removeEventListener("scroll", onScroll, true);
+    };
+  }
+
+  private settle(view: MarkdownView, state: MountState): void {
+    this.requestReanchor(view);
+    if (state.settleTimer !== null) window.clearTimeout(state.settleTimer);
+    state.settleTimer = window.setTimeout(() => {
+      state.settleTimer = null;
+      this.requestReanchor(view);
+    }, 250);
+  }
+
+  private requestReanchor(view: MarkdownView): void {
+    const state = this.mounts.get(view);
+    if (!state || state.reanchorFrameId !== null) return;
+    state.reanchorFrameId = window.requestAnimationFrame(() => {
+      state.reanchorFrameId = null;
+      if (!this.isCurrentMount(view, state)) return;
+      const block = state.block;
+      // A block inside a detached subtree already holds its document position;
+      // it returns together with that subtree. Only a block with no parent at
+      // all is waiting for a place.
+      if (!block) return;
+      if (block.parentElement && !block.isConnected) return;
+      const anchor = this.resolveAnchor(view);
+      if (!anchor) {
+        if (!block.parentElement) this.placeInHeader(view, block);
+        return;
+      }
+      if (block.parentElement && this.isAtAnchor(block, anchor)) return;
+      if (anchor.before) anchor.parent.insertBefore(block, anchor.ref);
+      else anchor.ref.insertAdjacentElement("afterend", block);
+    });
   }
 
   /* ────────────────────────────────────────────────
@@ -428,8 +554,14 @@ export default class HierarchyNavigator
     const index = renderBodyIndex(this, file);
     if (!index) return;
 
-    const rail = view.contentEl.querySelector<HTMLElement>(`.${BLOCK_CLASS}`);
-    const anchor = this.bodyAnchor(view.contentEl, rail);
+    // The index sits under the block, so it needs a block in the document. A
+    // view restored while scrolled past the header has none until the block is
+    // anchored again; the index would be stranded at the end of the note.
+    const rail = this.activeRoot(view).querySelector<HTMLElement>(
+      `.${BLOCK_CLASS}`,
+    );
+    if (!rail) return;
+    const anchor = this.bodyAnchor(this.activeRoot(view), rail);
     if (anchor?.parentElement) {
       anchor.insertAdjacentElement("afterend", index);
       return;
@@ -438,7 +570,7 @@ export default class HierarchyNavigator
     // Nothing to sit under (a theme hid both the title and Properties, or the
     // two mounts raced): fall back to the end of the reading column.
     const sizer =
-      view.contentEl.querySelector<HTMLElement>(".markdown-preview-sizer") ??
+      this.activeRoot(view).querySelector<HTMLElement>(".markdown-preview-sizer") ??
       view.contentEl;
     sizer.appendChild(index);
   }
@@ -498,12 +630,17 @@ export default class HierarchyNavigator
     });
   }
 
-  private beginMount(view: MarkdownView): MountState {
+  private beginMount(view: MarkdownView, file: TFile): MountState {
     this.disposeMount(view);
     const state: MountState = {
+      file,
+      block: null,
       frameId: null,
+      reanchorFrameId: null,
+      settleTimer: null,
       titleRetryUsed: false,
       disposed: false,
+      unwatchScroll: null,
     };
     this.mounts.set(view, state);
     return state;
@@ -519,6 +656,21 @@ export default class HierarchyNavigator
       state.disposed = true;
       if (state.frameId !== null) window.cancelAnimationFrame(state.frameId);
       state.frameId = null;
+      if (state.reanchorFrameId !== null) {
+        window.cancelAnimationFrame(state.reanchorFrameId);
+      }
+      state.reanchorFrameId = null;
+      if (state.settleTimer !== null) window.clearTimeout(state.settleTimer);
+      state.settleTimer = null;
+      state.unwatchScroll?.();
+      state.unwatchScroll = null;
+      // The block can live in a subtree Obsidian detached from the view, so
+      // `contentEl` cannot see it; destroy the tracked node itself.
+      if (state.block) {
+        destroyOwnedElement(state.block);
+        state.block.remove();
+        state.block = null;
+      }
       this.mounts.delete(view);
     }
     this.removeOwned(view.contentEl);
